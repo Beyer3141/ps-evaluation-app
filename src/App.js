@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend } from 'recharts';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
 import { ChevronDown, ChevronUp, Download, Upload, Save } from 'lucide-react';
 
 function App() {
@@ -8,6 +8,7 @@ function App() {
       id: 1,
       name: "山田太郎",
       color: "#3b82f6",
+      memo: "",
       scores: {
         dataAnalysis: 3,
         hypothesis: 3,
@@ -25,6 +26,7 @@ function App() {
       id: 2,
       name: "佐藤花子",
       color: "#ec4899",
+      memo: "",
       scores: {
         dataAnalysis: 2,
         hypothesis: 2,
@@ -42,7 +44,9 @@ function App() {
 
   const [selectedEmployees, setSelectedEmployees] = useState([1, 2]);
   const [showIdeal, setShowIdeal] = useState(true);
+  const [chartType, setChartType] = useState('radar'); // 'radar' or 'scatter'
   const [idealProfile, setIdealProfile] = useState({
+    memo: "",
     dataAnalysis: 4,
     hypothesis: 4,
     questioning: 4,
@@ -153,6 +157,18 @@ function App() {
     setIdealProfile(prev => ({ ...prev, [competency]: parseInt(value) }));
   };
 
+  const handleIdealMemoChange = (value) => {
+    setIdealProfile(prev => ({ ...prev, memo: value }));
+  };
+
+  const handleEmployeeMemoChange = (employeeId, value) => {
+    setEmployees(prev => prev.map(emp => 
+      emp.id === employeeId 
+        ? { ...emp, memo: value }
+        : emp
+    ));
+  };
+
   const addEmployee = () => {
     const newId = Math.max(...employees.map(e => e.id), 0) + 1;
     const colors = ["#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#f97316", "#14b8a6"];
@@ -163,6 +179,7 @@ function App() {
       id: newId,
       name: `メンバー${newId}`,
       color: availableColor,
+      memo: "",
       scores: {
         dataAnalysis: 1,
         hypothesis: 1,
@@ -217,7 +234,8 @@ function App() {
   };
 
   const calculateAverage = (scores) => {
-    const values = Object.values(scores);
+    const { memo, ...actualScores } = scores;
+    const values = Object.values(actualScores);
     return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
   };
 
@@ -232,6 +250,67 @@ function App() {
     const weaknesses = sorted.slice(-3).reverse();
     
     return { strengths, weaknesses };
+  };
+
+  // 散布図用のデータを計算
+  const calculateScatterData = () => {
+    const categories = {
+      analytical: ['dataAnalysis', 'hypothesis', 'problemFinding'], // 分析系
+      knowledge: ['businessUnderstanding', 'financial'], // 知識系
+      execution: ['problemSolving', 'strategy', 'support'], // 実行系
+      interpersonal: ['questioning', 'communication'] // 対人系
+    };
+
+    const calculateCategoryAverage = (scores, categoryKeys) => {
+      const values = categoryKeys.map(key => scores[key]);
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    };
+
+    const data = [];
+
+    // 各メンバーのデータ
+    employees.forEach(emp => {
+      if (selectedEmployees.includes(emp.id)) {
+        const analytical = calculateCategoryAverage(emp.scores, categories.analytical);
+        const knowledge = calculateCategoryAverage(emp.scores, categories.knowledge);
+        const execution = calculateCategoryAverage(emp.scores, categories.execution);
+        const interpersonal = calculateCategoryAverage(emp.scores, categories.interpersonal);
+        
+        // X軸: テクニカルスキル（分析+知識）
+        const technical = (analytical + knowledge) / 2;
+        // Y軸: ヒューマンスキル（実行+対人）
+        const human = (execution + interpersonal) / 2;
+        
+        data.push({
+          name: emp.name,
+          technical: parseFloat(technical.toFixed(2)),
+          human: parseFloat(human.toFixed(2)),
+          color: emp.color,
+          type: 'member'
+        });
+      }
+    });
+
+    // 理想形のデータ
+    if (showIdeal) {
+      const analytical = calculateCategoryAverage(idealProfile, categories.analytical);
+      const knowledge = calculateCategoryAverage(idealProfile, categories.knowledge);
+      const execution = calculateCategoryAverage(idealProfile, categories.execution);
+      const interpersonal = calculateCategoryAverage(idealProfile, categories.interpersonal);
+      
+      const technical = (analytical + knowledge) / 2;
+      const human = (execution + interpersonal) / 2;
+      
+      data.push({
+        name: '理想',
+        technical: parseFloat(technical.toFixed(2)),
+        human: parseFloat(human.toFixed(2)),
+        color: '#94a3b8',
+        type: 'ideal'
+      });
+    }
+
+    return data;
   };
 
   return (
@@ -305,53 +384,205 @@ function App() {
               />
               <span className="text-sm text-slate-700">理想形を表示</span>
             </label>
+
+            <div className="ml-auto flex gap-2 bg-slate-100 p-1 rounded-lg">
+              <button
+                onClick={() => setChartType('radar')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  chartType === 'radar'
+                    ? 'bg-white text-blue-600 shadow'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                レーダーチャート
+              </button>
+              <button
+                onClick={() => setChartType('scatter')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  chartType === 'scatter'
+                    ? 'bg-white text-blue-600 shadow'
+                    : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                マトリクス表
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h2 className="text-2xl font-bold text-slate-800 mb-6">能力レーダーチャート</h2>
-            <ResponsiveContainer width="100%" height={500}>
-              <RadarChart data={prepareChartData()}>
-                <PolarGrid stroke="#cbd5e1" />
-                <PolarAngleAxis 
-                  dataKey="competency" 
-                  tick={{ fill: '#475569', fontSize: 11 }}
-                />
-                <PolarRadiusAxis 
-                  angle={90} 
-                  domain={[0, 4]} 
-                  tick={{ fill: '#64748b' }}
-                  tickCount={5}
-                />
-                
-                {showIdeal && (
-                  <Radar
-                    name="理想"
-                    dataKey="理想"
-                    stroke="#94a3b8"
-                    fill="#94a3b8"
-                    fillOpacity={0.1}
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
+            <h2 className="text-2xl font-bold text-slate-800 mb-2">
+              {chartType === 'radar' ? '能力レーダーチャート' : '能力マトリクス表'}
+            </h2>
+            {chartType === 'scatter' && (
+              <p className="text-sm text-slate-600 mb-4">
+                横軸: テクニカルスキル（分析+知識） / 縦軸: ヒューマンスキル（実行+対人）
+              </p>
+            )}
+            
+            {chartType === 'radar' ? (
+              <ResponsiveContainer width="100%" height={500}>
+                <RadarChart data={prepareChartData()}>
+                  <PolarGrid stroke="#cbd5e1" />
+                  <PolarAngleAxis 
+                    dataKey="competency" 
+                    tick={{ fill: '#475569', fontSize: 11 }}
                   />
-                )}
-                
-                {employees.filter(emp => selectedEmployees.includes(emp.id)).map(emp => (
-                  <Radar
-                    key={emp.id}
-                    name={emp.name}
-                    dataKey={emp.name}
-                    stroke={emp.color}
-                    fill={emp.color}
-                    fillOpacity={0.3}
-                    strokeWidth={2}
+                  <PolarRadiusAxis 
+                    angle={90} 
+                    domain={[0, 4]} 
+                    tick={{ fill: '#64748b' }}
+                    tickCount={5}
                   />
-                ))}
-                
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
+                  
+                  {showIdeal && (
+                    <Radar
+                      name="理想"
+                      dataKey="理想"
+                      stroke="#94a3b8"
+                      fill="#94a3b8"
+                      fillOpacity={0.1}
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                    />
+                  )}
+                  
+                  {employees.filter(emp => selectedEmployees.includes(emp.id)).map(emp => (
+                    <Radar
+                      key={emp.id}
+                      name={emp.name}
+                      dataKey={emp.name}
+                      stroke={emp.color}
+                      fill={emp.color}
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                    />
+                  ))}
+                  
+                  <Legend />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer width="100%" height={500}>
+                <ScatterChart margin={{ top: 20, right: 20, bottom: -20, left: -20 }}>
+                  {/* 背景の4象限 */}
+                  <defs>
+                    <pattern id="strengthBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
+                      <rect width="100%" height="100%" fill="#fecaca" opacity="0.3"/>
+                    </pattern>
+                    <pattern id="weaknessBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
+                      <rect width="100%" height="100%" fill="#bfdbfe" opacity="0.3"/>
+                    </pattern>
+                    <pattern id="opportunityBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
+                      <rect width="100%" height="100%" fill="#fed7aa" opacity="0.3"/>
+                    </pattern>
+                    <pattern id="threatBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
+                      <rect width="100%" height="100%" fill="#ddd6fe" opacity="0.3"/>
+                    </pattern>
+                  </defs>
+                  
+                  {/* 象限の背景色 */}
+                  <rect x="50%" y="0" width="50%" height="50%" fill="#fecaca" opacity="0.2" />
+                  <rect x="0" y="0" width="50%" height="50%" fill="#bfdbfe" opacity="0.2" />
+                  <rect x="0" y="50%" width="50%" height="50%" fill="#fed7aa" opacity="0.2" />
+                  <rect x="50%" y="50%" width="50%" height="50%" fill="#ddd6fe" opacity="0.2" />
+                  
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  
+                  {/* 中央の十字線を太く */}
+                  <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#94a3b8" strokeWidth="2" />
+                  
+                  <XAxis 
+                    type="number" 
+                    dataKey="technical" 
+                    name="テクニカルスキル"
+                    domain={[0, 4]}
+                    ticks={[0, 1, 2, 3, 4]}
+                    label={{ value: 'テクニカルスキル（分析力+知識） →', position: 'bottom', offset: 0 }}
+                    tick={{ fill: '#475569' }}
+                  />
+                  <YAxis 
+                    type="number" 
+                    dataKey="human" 
+                    name="ヒューマンスキル"
+                    domain={[0, 4]}
+                    ticks={[0, 1, 2, 3, 4]}
+                    label={{ value: 'ヒューマンスキル（実行力+対人力） ↑', angle: -90, position: 'center', offset: 0 }}
+                    tick={{ fill: '#475569' }}
+                  />
+                  <ZAxis range={[400, 400]} />
+                  
+                  {/* 象限ラベル - 薄い色で、シンプルに */}
+                  <text x="75%" y="25%" textAnchor="middle" fill="#991b1b" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                    高テクニカル・高ヒューマン
+                  </text>
+                  
+                  <text x="25%" y="25%" textAnchor="middle" fill="#1e40af" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                    低テクニカル・高ヒューマン
+                  </text>
+                  
+                  <text x="25%" y="75%" textAnchor="middle" fill="#c2410c" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                    低テクニカル・低ヒューマン
+                  </text>
+                  
+                  <text x="75%" y="75%" textAnchor="middle" fill="#5b21b6" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                    高テクニカル・低ヒューマン
+                  </text>
+                  
+                  <Tooltip 
+                    cursor={{ strokeDasharray: '3 3' }}
+                    content={({ payload }) => {
+                      if (payload && payload.length > 0) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
+                            <p className="font-bold text-slate-800">{data.name}</p>
+                            <p className="text-sm text-slate-600">
+                              テクニカル: {data.technical}
+                            </p>
+                            <p className="text-sm text-slate-600">
+                              ヒューマン: {data.human}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Scatter data={calculateScatterData()} shape="circle">
+                    {calculateScatterData().map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.color}
+                        stroke={entry.type === 'ideal' ? '#64748b' : entry.color}
+                        strokeWidth={entry.type === 'ideal' ? 3 : 2}
+                        strokeDasharray={entry.type === 'ideal' ? '5 5' : '0'}
+                      />
+                    ))}
+                  </Scatter>
+                  <Legend 
+                    content={() => (
+                      <div className="flex flex-wrap justify-center gap-4 mt-4">
+                        {calculateScatterData().map((entry, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <div 
+                              className="w-4 h-4 rounded-full"
+                              style={{ 
+                                backgroundColor: entry.color,
+                                border: entry.type === 'ideal' ? '2px dashed #64748b' : 'none'
+                              }}
+                            />
+                            <span className="text-sm text-slate-700">{entry.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  />
+                </ScatterChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -391,6 +622,19 @@ function App() {
                       </select>
                     </div>
                   ))}
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-300">
+                  <label className="text-xs text-slate-600 font-semibold mb-2 block">
+                    📝 メモ
+                  </label>
+                  <textarea
+                    value={idealProfile.memo || ""}
+                    onChange={(e) => handleIdealMemoChange(e.target.value)}
+                    placeholder="目標設定の理由や達成時期などを記入..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none resize-none"
+                    rows="3"
+                  />
                 </div>
               </div>
             )}
@@ -485,6 +729,19 @@ function App() {
                     </div>
                   ))}
                 </div>
+
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <label className="text-xs text-slate-600 font-semibold mb-2 block">
+                    📝 メモ
+                  </label>
+                  <textarea
+                    value={emp.memo || ""}
+                    onChange={(e) => handleEmployeeMemoChange(emp.id, e.target.value)}
+                    placeholder="育成課題、目標、特記事項などを記入..."
+                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+                    rows="3"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -552,6 +809,26 @@ function App() {
               <p className="text-sm text-blue-50">「3ヶ月後にはこの形に」と理想形との差分から逆算して育成</p>
             </div>
           </div>
+          
+          {chartType === 'scatter' && (
+            <div className="mt-6 pt-6 border-t border-white/20">
+              <h3 className="font-bold mb-3 text-lg">📊 マトリクスの見方</h3>
+              <div className="grid md:grid-cols-2 gap-3 text-sm text-blue-50">
+                <div className="bg-white/10 p-3 rounded-lg">
+                  <strong className="text-white">右上:</strong> 高テクニカル・高ヒューマン
+                </div>
+                <div className="bg-white/10 p-3 rounded-lg">
+                  <strong className="text-white">左上:</strong> 低テクニカル・高ヒューマン
+                </div>
+                <div className="bg-white/10 p-3 rounded-lg">
+                  <strong className="text-white">左下:</strong> 低テクニカル・低ヒューマン
+                </div>
+                <div className="bg-white/10 p-3 rounded-lg">
+                  <strong className="text-white">右下:</strong> 高テクニカル・低ヒューマン
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
