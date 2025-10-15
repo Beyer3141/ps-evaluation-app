@@ -54,16 +54,16 @@ function App() {
   const [chartType, setChartType] = useState('radar');
   const [idealProfile, setIdealProfile] = useState({
     memo: "",
-    dataAnalysis: 4,
-    hypothesis: 4,
-    questioning: 4,
-    businessUnderstanding: 4,
-    problemFinding: 4,
-    problemSolving: 4,
-    financial: 4,
-    strategy: 4,
-    communication: 4,
-    support: 4
+    dataAnalysis: 5,
+    hypothesis: 5,
+    questioning: 5,
+    businessUnderstanding: 5,
+    problemFinding: 5,
+    problemSolving: 5,
+    financial: 5,
+    strategy: 5,
+    communication: 5,
+    support: 5
   });
   const [lastSaved, setLastSaved] = useState(null);
   const [teamMemo, setTeamMemo] = useState("");
@@ -505,9 +505,9 @@ function App() {
                   />
                   <PolarRadiusAxis 
                     angle={90} 
-                    domain={[0, 4]} 
+                    domain={[0, 5]} 
                     tick={{ fill: '#64748b' }}
-                    tickCount={5}
+                    tickCount={6}
                   />
                   
                   {showIdeal && (
@@ -552,7 +552,7 @@ function App() {
                     type="number" 
                     dataKey="technical" 
                     name="テクニカルスキル"
-                    domain={[0, 4]}
+                    domain={[0, 5]}
                     label={{ value: 'テクニカルスキル（分析力+知識） →', position: 'bottom', offset: 90, style: { fontSize: 14, fill: '#475569' } }}
                     tick={{ fill: '#64748b', fontSize: 12 }}
                     axisLine={false}
@@ -562,8 +562,8 @@ function App() {
                     type="number" 
                     dataKey="human" 
                     name="ヒューマンスキル"
-                    domain={[0, 4]}
-                    ticks={[0, 1, 2, 3, 4]}
+                    domain={[0, 5]}
+                    ticks={[0, 1, 2, 3, 4, 5]}
                     label={{ value: 'ヒューマンスキル（実行力+対人力） ↑', angle: -90, position: 'left', offset: 60, style: { fontSize: 14, fill: '#475569' } }}
                     tick={{ fill: '#64748b', fontSize: 12 }}
                     axisLine={false}
@@ -713,6 +713,7 @@ function App() {
                         <option value="2">Lv.2</option>
                         <option value="3">Lv.3</option>
                         <option value="4">Lv.4</option>
+                        <option value="5">Lv.5</option>
                       </select>
                     </div>
                   ))}
@@ -841,7 +842,7 @@ function App() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-4 gap-4">
+        <div className="grid md:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="text-center">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -882,6 +883,16 @@ function App() {
             </div>
           </div>
         </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+  <div className="text-center">
+    <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-3">
+      <span className="text-2xl">🏆</span>
+    </div>
+    <h3 className="font-bold text-slate-800 mb-2">Lv.5 マスター</h3>
+    <p className="text-xs text-slate-600">組織をリードし、他者を育成できる</p>
+  </div>
+</div>
 
         <div className="mt-8 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl shadow-xl p-8">
           <h2 className="text-2xl font-bold mb-4">💡 活用のポイント</h2>
