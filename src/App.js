@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell } from 'recharts';
 import { ChevronDown, ChevronUp, Download, Upload, Save, Wifi, WifiOff } from 'lucide-react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // Supabaseクライアントの初期化
 const supabase = createClient(
@@ -9,13 +12,193 @@ const supabase = createClient(
   process.env.REACT_APP_SUPABASE_ANON_KEY
 );
 
+// ドラッグ可能なメンバーカード
+function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleEmployee, removeEmployee, handleScoreChange, handleEmployeeMemoChange, calculateAverage, getStrengthsAndWeaknesses, setEmployees }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: emp.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-white rounded-xl shadow-lg pt-4 pb-1 px-6">
+      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-3 flex-1">
+  <div 
+    {...attributes}
+    {...listeners}
+    className="cursor-move p-2 hover:bg-slate-100 rounded"
+    title="ドラッグして並び替え"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </div>
+  <button
+    onClick={() => {
+      setEmployees(prev => prev.map(employee => 
+        employee.id === emp.id ? { ...employee, isExpanded: !employee.isExpanded } : employee
+      ));
+    }}
+    className="p-1 hover:bg-slate-100 rounded transition-colors"
+    title={emp.isExpanded ? "折りたたむ" : "展開する"}
+  >
+    {emp.isExpanded ? (
+      <ChevronUp className="w-5 h-5 text-slate-600" />
+    ) : (
+      <ChevronDown className="w-5 h-5 text-slate-600" />
+    )}
+  </button>
+  <div 
+    className="w-4 h-4 rounded-full" 
+    style={{ backgroundColor: emp.color }}
+  ></div>
+  <input
+    type="text"
+    value={emp.name}
+    onChange={(e) => {
+      const newName = e.target.value;
+      setEmployees(prev => prev.map(employee => 
+        employee.id === emp.id ? { ...employee, name: newName } : employee
+      ));
+    }}
+    className="text-xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-blue-500 outline-none transition-colors flex-1"
+  />
+</div>
+
+<div className="flex gap-2 flex-shrink-0">
+  <button
+    onClick={() => toggleEmployee(emp.id)}
+    className={`px-3 py-1 rounded text-sm font-medium transition-colors whitespace-nowrap ${
+      selectedEmployees.includes(emp.id)
+        ? 'bg-blue-500 text-white'
+        : 'bg-slate-200 text-slate-600'
+    }`}
+  >
+    {selectedEmployees.includes(emp.id) ? '表示中' : '非表示'}
+  </button>
+  <button
+    onClick={() => removeEmployee(emp.id)}
+    className="px-3 py-1 bg-red-500 text-white rounded text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
+  >
+    削除
+  </button>
+</div>
+</div>
+
+      <div className="mb-4 flex items-center gap-4">
+        <div className="bg-slate-100 rounded-lg px-4 py-2">
+          <div className="text-xs text-slate-600">平均スコア</div>
+          <div className="text-2xl font-bold text-slate-800">
+            {calculateAverage(emp.scores)}
+          </div>
+        </div>
+        
+        <div className="flex-1">
+          {(() => {
+            const { strengths, weaknesses } = getStrengthsAndWeaknesses(emp.scores);
+            return (
+              <div className="text-xs">
+                <div className="mb-1">
+                  <span className="text-green-600 font-semibold">強み: </span>
+                  <span className="text-slate-600">
+                    {strengths.map(s => s.name).join(', ')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-orange-600 font-semibold">課題: </span>
+                  <span className="text-slate-600">
+                    {weaknesses.map(w => w.name).join(', ')}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      {emp.isExpanded && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            {Object.entries(competencyNames).map(([key, name]) => (
+              <div key={key} className="flex items-center justify-between gap-2">
+                <label className="text-xs text-slate-600 flex-1">
+                  {name}
+                </label>
+                <select
+                  value={emp.scores[key]}
+                  onChange={(e) => handleScoreChange(emp.id, key, e.target.value)}
+                  className="w-16 px-2 py-1 border border-slate-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                >
+                  <option value="1">Lv.1</option>
+                  <option value="2">Lv.2</option>
+                  <option value="3">Lv.3</option>
+                  <option value="4">Lv.4</option>
+                  <option value="5">Lv.5</option>
+                </select>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <label className="text-xs text-slate-600 font-semibold mb-2 block">
+              📝 メモ
+            </label>
+            <textarea
+              value={emp.memo || ""}
+              onChange={(e) => handleEmployeeMemoChange(emp.id, e.target.value)}
+              placeholder="育成課題、目標、特記事項などを記入..."
+              className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+              rows="3"
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function App() {
+  // ドラッグ&ドロップのセンサー設定
+const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8,
+    },
+  })
+);
+
+// ドラッグ終了時の処理
+const handleDragEnd = (event) => {
+  const { active, over } = event;
+
+  if (over && active.id !== over.id) {
+    setEmployees((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }
+};
+
   const [employees, setEmployees] = useState([
     {
       id: 1,
       name: "山田太郎",
       color: "#3b82f6",
       memo: "",
+      isExpanded: true,
       scores: {
         dataAnalysis: 3,
         hypothesis: 3,
@@ -34,6 +217,7 @@ function App() {
       name: "佐藤花子",
       color: "#ec4899",
       memo: "",
+      isExpanded: true,
       scores: {
         dataAnalysis: 2,
         hypothesis: 2,
@@ -54,6 +238,7 @@ function App() {
   const [chartType, setChartType] = useState('radar');
   const [idealProfile, setIdealProfile] = useState({
     memo: "",
+    isExpanded: true,
     dataAnalysis: 5,
     hypothesis: 5,
     questioning: 5,
@@ -254,6 +439,7 @@ function App() {
       name: `メンバー${newId}`,
       color: availableColor,
       memo: "",
+      isExpanded: true,
       scores: {
         dataAnalysis: 1,
         hypothesis: 1,
@@ -308,7 +494,7 @@ function App() {
   };
 
   const calculateAverage = (scores) => {
-    const { memo, ...actualScores } = scores;
+    const { memo, isExpanded,...actualScores } = scores;
     const values = Object.values(actualScores);
     return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
   };
@@ -352,6 +538,7 @@ function App() {
         const human = (execution + interpersonal) / 2;
         
         data.push({
+          id: emp.id,
           name: emp.name,
           technical: parseFloat(technical.toFixed(2)),
           human: parseFloat(human.toFixed(2)),
@@ -371,6 +558,7 @@ function App() {
       const human = (execution + interpersonal) / 2;
       
       data.push({
+        id: 'ideal',
         name: '理想',
         technical: parseFloat(technical.toFixed(2)),
         human: parseFloat(human.toFixed(2)),
@@ -384,7 +572,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[80%] mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -539,7 +727,7 @@ function App() {
               </ResponsiveContainer>
             ) : (
               <ResponsiveContainer width="100%" height={500}>
-                <ScatterChart margin={{ top: 30, right: 130, bottom: -130, left: -90 }}>
+                <ScatterChart margin={{ top: 10, right: 55, bottom: -90, left: -55 }}>
                   <rect x="50%" y="0" width="50%" height="50%" fill="#fecaca" opacity="0.12" />
                   <rect x="0" y="0" width="50%" height="50%" fill="#bfdbfe" opacity="0.12" />
                   <rect x="0" y="50%" width="50%" height="50%" fill="#fed7aa" opacity="0.12" />
@@ -627,9 +815,9 @@ function App() {
     );
   }}
 >
-                    {calculateScatterData().map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
+{calculateScatterData().map((entry) => (
+  <Cell 
+    key={`cell-${entry.id}`}
                         fill={entry.type === 'ideal' ? 'transparent' : entry.color}
                         stroke={entry.type === 'ideal' ? entry.color : '#ffffff'}
                         strokeWidth={entry.type === 'ideal' ? 4 : 4}
@@ -640,17 +828,17 @@ function App() {
                   <Legend 
   content={() => (
     <div 
-      className="flex flex-wrap justify-center gap-4" 
+      className="flex flex-wrap justify-center gap-1" 
       style={{ 
         position: 'absolute', 
-        bottom: '75px',  // 下から20pxの位置
-        left: '65%', 
+        bottom: '30px',  // 下から20pxの位置
+        left: '57%', 
         transform: 'translateX(-50%)',
         width: '100%'
       }}
     >
-                        {calculateScatterData().map((entry, index) => (
-                          <div key={index} className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg">
+                        {calculateScatterData().map((entry) => (
+  <div key={entry.id} className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg">
                             <div 
                               className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
                               style={{ backgroundColor: entry.color }}
@@ -679,170 +867,106 @@ function App() {
           </div>
           </div>
 
-          <div className="space-y-4">
-            {showIdeal && (
-              <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-lg p-6 border-2 border-slate-300">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 rounded-full bg-slate-400"></div>
-                    <h3 className="text-xl font-bold text-slate-700">理想形（目標レベル）</h3>
-                  </div>
-                </div>
+          <div className="space-y-3">
+          {showIdeal && (
+  <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-lg pt-3 pb-0 px-6 border-2 border-slate-300">
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setIdealProfile(prev => ({ ...prev, isExpanded: !prev.isExpanded }))}
+          className="p-1 hover:bg-slate-100 rounded transition-colors"
+          title={idealProfile.isExpanded ? "折りたたむ" : "展開する"}
+        >
+          {idealProfile.isExpanded ? (
+            <ChevronUp className="w-5 h-5 text-slate-600" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-slate-600" />
+          )}
+        </button>
+        <div className="w-4 h-4 rounded-full bg-slate-400"></div>
+        <h3 className="text-xl font-bold text-slate-700">理想形（目標レベル）</h3>
+      </div>
+    </div>
 
-                <div className="mb-4">
-                  <div className="bg-white rounded-lg px-4 py-2 inline-block">
-                    <div className="text-xs text-slate-600">平均スコア</div>
-                    <div className="text-2xl font-bold text-slate-800">
-                      {calculateAverage(idealProfile)}
-                    </div>
-                  </div>
-                </div>
+    <div className="mb-4">
+      <div className="bg-white rounded-lg px-4 py-2 inline-block">
+        <div className="text-xs text-slate-600">平均スコア</div>
+        <div className="text-2xl font-bold text-slate-800">
+          {calculateAverage(idealProfile)}
+        </div>
+      </div>
+    </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(competencyNames).map(([key, name]) => (
-                    <div key={key} className="flex items-center justify-between gap-2">
-                      <label className="text-xs text-slate-600 flex-1">
-                        {name}
-                      </label>
-                      <select
-                        value={idealProfile[key]}
-                        onChange={(e) => handleIdealChange(key, e.target.value)}
-                        className="w-16 px-2 py-1 border border-slate-300 rounded text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none bg-white"
-                      >
-                        <option value="1">Lv.1</option>
-                        <option value="2">Lv.2</option>
-                        <option value="3">Lv.3</option>
-                        <option value="4">Lv.4</option>
-                        <option value="5">Lv.5</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
+    {idealProfile.isExpanded && (
+      <>
+        <div className="grid grid-cols-2 gap-3">
+          {Object.entries(competencyNames).map(([key, name]) => (
+            <div key={key} className="flex items-center justify-between gap-2">
+              <label className="text-xs text-slate-600 flex-1">
+                {name}
+              </label>
+              <select
+                value={idealProfile[key]}
+                onChange={(e) => handleIdealChange(key, e.target.value)}
+                className="w-16 px-2 py-1 border border-slate-300 rounded text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none bg-white"
+              >
+                <option value="1">Lv.1</option>
+                <option value="2">Lv.2</option>
+                <option value="3">Lv.3</option>
+                <option value="4">Lv.4</option>
+                <option value="5">Lv.5</option>
+              </select>
+            </div>
+          ))}
+        </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-300">
-                  <label className="text-xs text-slate-600 font-semibold mb-2 block">
-                    📝 メモ
-                  </label>
-                  <textarea
-                    value={idealProfile.memo || ""}
-                    onChange={(e) => handleIdealMemoChange(e.target.value)}
-                    placeholder="目標設定の理由や達成時期などを記入..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none resize-none"
-                    rows="3"
-                  />
-                </div>
-              </div>
-            )}
+        <div className="mt-4 pt-4 border-t border-slate-300">
+          <label className="text-xs text-slate-600 font-semibold mb-2 block">
+            📝 メモ
+          </label>
+          <textarea
+            value={idealProfile.memo || ""}
+            onChange={(e) => handleIdealMemoChange(e.target.value)}
+            placeholder="目標設定の理由や達成時期などを記入..."
+            className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 outline-none resize-none"
+            rows="3"
+          />
+        </div>
+      </>
+    )}
+  </div>
+)}
 
-            {employees.map(emp => (
-              <div key={emp.id} className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: emp.color }}
-                    ></div>
-                    <input
-                      type="text"
-                      value={emp.name}
-                      onChange={(e) => {
-                        const newName = e.target.value;
-                        setEmployees(prev => prev.map(employee => 
-                          employee.id === emp.id ? { ...employee, name: newName } : employee
-                        ));
-                      }}
-                      className="text-xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-blue-500 outline-none transition-colors"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => toggleEmployee(emp.id)}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        selectedEmployees.includes(emp.id)
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-slate-200 text-slate-600'
-                      }`}
-                    >
-                      {selectedEmployees.includes(emp.id) ? '表示中' : '非表示'}
-                    </button>
-                    <button
-                      onClick={() => removeEmployee(emp.id)}
-                      className="px-3 py-1 bg-red-500 text-white rounded text-sm font-medium hover:bg-red-600 transition-colors"
-                    >
-                      削除
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-4 flex items-center gap-4">
-                  <div className="bg-slate-100 rounded-lg px-4 py-2">
-                    <div className="text-xs text-slate-600">平均スコア</div>
-                    <div className="text-2xl font-bold text-slate-800">
-                      {calculateAverage(emp.scores)}
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1">
-                    {(() => {
-                      const { strengths, weaknesses } = getStrengthsAndWeaknesses(emp.scores);
-                      return (
-                        <div className="text-xs">
-                          <div className="mb-1">
-                            <span className="text-green-600 font-semibold">強み: </span>
-                            <span className="text-slate-600">
-                              {strengths.map(s => s.name).join(', ')}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-orange-600 font-semibold">課題: </span>
-                            <span className="text-slate-600">
-                              {weaknesses.map(w => w.name).join(', ')}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(competencyNames).map(([key, name]) => (
-                    <div key={key} className="flex items-center justify-between gap-2">
-                      <label className="text-xs text-slate-600 flex-1">
-                        {name}
-                      </label>
-                      <select
-                        value={emp.scores[key]}
-                        onChange={(e) => handleScoreChange(emp.id, key, e.target.value)}
-                        className="w-16 px-2 py-1 border border-slate-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                      >
-                        <option value="1">Lv.1</option>
-                        <option value="2">Lv.2</option>
-                        <option value="3">Lv.3</option>
-                        <option value="4">Lv.4</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-200">
-                  <label className="text-xs text-slate-600 font-semibold mb-2 block">
-                    📝 メモ
-                  </label>
-                  <textarea
-                    value={emp.memo || ""}
-                    onChange={(e) => handleEmployeeMemoChange(emp.id, e.target.value)}
-                    placeholder="育成課題、目標、特記事項などを記入..."
-                    className="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none"
-                    rows="3"
-                  />
-                </div>
-              </div>
-            ))}
+<DndContext
+  sensors={sensors}
+  collisionDetection={closestCenter}
+  onDragEnd={handleDragEnd}
+>
+  <SortableContext
+    items={employees.map(emp => emp.id)}
+    strategy={verticalListSortingStrategy}
+  >
+    {employees.map(emp => (
+      <SortableEmployeeCard
+        key={emp.id}
+        emp={emp}
+        competencyNames={competencyNames}
+        selectedEmployees={selectedEmployees}
+        toggleEmployee={toggleEmployee}
+        removeEmployee={removeEmployee}
+        handleScoreChange={handleScoreChange}
+        handleEmployeeMemoChange={handleEmployeeMemoChange}
+        calculateAverage={calculateAverage}
+        getStrengthsAndWeaknesses={getStrengthsAndWeaknesses}
+        setEmployees={setEmployees}
+      />
+    ))}
+  </SortableContext>
+</DndContext>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-5 gap-4">
+        <div className="grid md:grid-cols-4 gap-5">
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="text-center">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
