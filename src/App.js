@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
-import { ChevronDown, ChevronUp, Download, Upload, Save } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell } from 'recharts';
+import { ChevronDown, ChevronUp, Download, Upload, Save, Wifi, WifiOff } from 'lucide-react';
+
+// Supabaseクライアントの初期化
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
 
 function App() {
   const [employees, setEmployees] = useState([
@@ -44,7 +51,7 @@ function App() {
 
   const [selectedEmployees, setSelectedEmployees] = useState([1, 2]);
   const [showIdeal, setShowIdeal] = useState(true);
-  const [chartType, setChartType] = useState('radar'); // 'radar' or 'scatter'
+  const [chartType, setChartType] = useState('radar');
   const [idealProfile, setIdealProfile] = useState({
     memo: "",
     dataAnalysis: 4,
@@ -59,6 +66,9 @@ function App() {
     support: 4
   });
   const [lastSaved, setLastSaved] = useState(null);
+  const [teamMemo, setTeamMemo] = useState("");
+  const [isOnline, setIsOnline] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const competencyNames = {
     dataAnalysis: "データ分析力",
@@ -73,35 +83,99 @@ function App() {
     support: "伴走支援力"
   };
 
-  // 初回読み込み時にlocalStorageからデータを復元
+  // 初回読み込み時にSupabaseからデータを取得
   useEffect(() => {
-    const savedData = localStorage.getItem('psEvaluationData');
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
+    loadFromSupabase();
+    
+    // リアルタイム同期を設定
+    const subscription = supabase
+      .channel('evaluation_data_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'evaluation_data' },
+        (payload) => {
+          console.log('データが更新されました:', payload);
+          loadFromSupabase();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Supabaseからデータを読み込む
+  const loadFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('evaluation_data')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+
+      if (data && data.data) {
+        const parsed = data.data;
         if (parsed.employees) setEmployees(parsed.employees);
         if (parsed.idealProfile) setIdealProfile(parsed.idealProfile);
         if (parsed.selectedEmployees) setSelectedEmployees(parsed.selectedEmployees);
         if (parsed.showIdeal !== undefined) setShowIdeal(parsed.showIdeal);
-        setLastSaved(new Date(parsed.savedAt));
-      } catch (error) {
-        console.error('データの読み込みに失敗しました', error);
+        if (parsed.teamMemo) setTeamMemo(parsed.teamMemo); 
+        setLastSaved(new Date(data.updated_at));
       }
+      setIsOnline(true);
+    } catch (error) {
+      console.error('データの読み込みに失敗:', error);
+      setIsOnline(false);
     }
-  }, []);
+  };
 
-  // データを保存
-  const saveData = () => {
-    const dataToSave = {
-      employees,
-      idealProfile,
-      selectedEmployees,
-      showIdeal,
-      savedAt: new Date().toISOString()
-    };
-    localStorage.setItem('psEvaluationData', JSON.stringify(dataToSave));
-    setLastSaved(new Date());
-    alert('データを保存しました！');
+  // Supabaseにデータを保存
+  const saveToSupabase = async () => {
+    setIsSaving(true);
+    try {
+      const dataToSave = {
+        employees,
+        idealProfile,
+        selectedEmployees,
+        showIdeal,
+        teamMemo
+      };
+
+      // 既存のデータを更新（最初のレコードを更新）
+      const { data: existingData } = await supabase
+        .from('evaluation_data')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (existingData) {
+        const { error } = await supabase
+          .from('evaluation_data')
+          .update({ data: dataToSave })
+          .eq('id', existingData.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('evaluation_data')
+          .insert([{ data: dataToSave }]);
+
+        if (error) throw error;
+      }
+
+      setLastSaved(new Date());
+      setIsOnline(true);
+      alert('データを保存しました！他のユーザーにも同期されます。');
+    } catch (error) {
+      console.error('保存エラー:', error);
+      alert('保存に失敗しました: ' + error.message);
+      setIsOnline(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // JSONファイルとしてエクスポート
@@ -135,14 +209,14 @@ function App() {
         if (imported.idealProfile) setIdealProfile(imported.idealProfile);
         if (imported.selectedEmployees) setSelectedEmployees(imported.selectedEmployees);
         if (imported.showIdeal !== undefined) setShowIdeal(imported.showIdeal);
-        alert('データをインポートしました！');
+        alert('データをインポートしました！保存ボタンを押してSupabaseに反映してください。');
       } catch (error) {
         alert('ファイルの読み込みに失敗しました');
         console.error(error);
       }
     };
     reader.readAsText(file);
-    event.target.value = ''; // 同じファイルを再度選択できるようにリセット
+    event.target.value = '';
   };
 
   const handleScoreChange = (employeeId, competency, value) => {
@@ -252,13 +326,12 @@ function App() {
     return { strengths, weaknesses };
   };
 
-  // 散布図用のデータを計算
   const calculateScatterData = () => {
     const categories = {
-      analytical: ['dataAnalysis', 'hypothesis', 'problemFinding'], // 分析系
-      knowledge: ['businessUnderstanding', 'financial'], // 知識系
-      execution: ['problemSolving', 'strategy', 'support'], // 実行系
-      interpersonal: ['questioning', 'communication'] // 対人系
+      analytical: ['dataAnalysis', 'hypothesis', 'problemFinding'],
+      knowledge: ['businessUnderstanding', 'financial'],
+      execution: ['problemSolving', 'strategy', 'support'],
+      interpersonal: ['questioning', 'communication']
     };
 
     const calculateCategoryAverage = (scores, categoryKeys) => {
@@ -268,7 +341,6 @@ function App() {
 
     const data = [];
 
-    // 各メンバーのデータ
     employees.forEach(emp => {
       if (selectedEmployees.includes(emp.id)) {
         const analytical = calculateCategoryAverage(emp.scores, categories.analytical);
@@ -276,9 +348,7 @@ function App() {
         const execution = calculateCategoryAverage(emp.scores, categories.execution);
         const interpersonal = calculateCategoryAverage(emp.scores, categories.interpersonal);
         
-        // X軸: テクニカルスキル（分析+知識）
         const technical = (analytical + knowledge) / 2;
-        // Y軸: ヒューマンスキル（実行+対人）
         const human = (execution + interpersonal) / 2;
         
         data.push({
@@ -291,7 +361,6 @@ function App() {
       }
     });
 
-    // 理想形のデータ
     if (showIdeal) {
       const analytical = calculateCategoryAverage(idealProfile, categories.analytical);
       const knowledge = calculateCategoryAverage(idealProfile, categories.knowledge);
@@ -327,13 +396,18 @@ function App() {
               </p>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${isOnline ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+                <span className="text-xs font-medium">{isOnline ? 'オンライン' : 'オフライン'}</span>
+              </div>
               <button
-                onClick={saveData}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium"
+                onClick={saveToSupabase}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                保存
+                {isSaving ? '保存中...' : '保存'}
               </button>
               <button
                 onClick={exportData}
@@ -357,13 +431,13 @@ function App() {
 
           {lastSaved && (
             <div className="text-xs text-slate-500 mb-4">
-              最終保存: {lastSaved.toLocaleString('ja-JP')}
+              最終更新: {lastSaved.toLocaleString('ja-JP')}
             </div>
           )}
           
           <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-6">
             <p className="text-sm text-slate-700">
-              <strong>使い方:</strong> 各メンバーの能力レベル（1-4）を入力すると、レーダーチャートで可視化されます。変更は自動保存されませんので、「保存」ボタンを押してください。
+              <strong>共有機能有効:</strong> 変更を保存すると、他のユーザーにもリアルタイムで同期されます。
             </p>
           </div>
 
@@ -411,7 +485,7 @@ function App() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white rounded-2xl shadow-xl p-8 pb-24">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">
               {chartType === 'radar' ? '能力レーダーチャート' : '能力マトリクス表'}
             </h2>
@@ -465,32 +539,12 @@ function App() {
               </ResponsiveContainer>
             ) : (
               <ResponsiveContainer width="100%" height={500}>
-                <ScatterChart margin={{ top: 20, right: 20, bottom: -20, left: -20 }}>
-                  {/* 背景の4象限 */}
-                  <defs>
-                    <pattern id="strengthBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
-                      <rect width="100%" height="100%" fill="#fecaca" opacity="0.3"/>
-                    </pattern>
-                    <pattern id="weaknessBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
-                      <rect width="100%" height="100%" fill="#bfdbfe" opacity="0.3"/>
-                    </pattern>
-                    <pattern id="opportunityBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
-                      <rect width="100%" height="100%" fill="#fed7aa" opacity="0.3"/>
-                    </pattern>
-                    <pattern id="threatBg" patternUnits="userSpaceOnUse" width="100%" height="100%">
-                      <rect width="100%" height="100%" fill="#ddd6fe" opacity="0.3"/>
-                    </pattern>
-                  </defs>
+                <ScatterChart margin={{ top: 30, right: 130, bottom: -130, left: -90 }}>
+                  <rect x="50%" y="0" width="50%" height="50%" fill="#fecaca" opacity="0.12" />
+                  <rect x="0" y="0" width="50%" height="50%" fill="#bfdbfe" opacity="0.12" />
+                  <rect x="0" y="50%" width="50%" height="50%" fill="#fed7aa" opacity="0.12" />
+                  <rect x="50%" y="50%" width="50%" height="50%" fill="#ddd6fe" opacity="0.12" />
                   
-                  {/* 象限の背景色 */}
-                  <rect x="50%" y="0" width="50%" height="50%" fill="#fecaca" opacity="0.2" />
-                  <rect x="0" y="0" width="50%" height="50%" fill="#bfdbfe" opacity="0.2" />
-                  <rect x="0" y="50%" width="50%" height="50%" fill="#fed7aa" opacity="0.2" />
-                  <rect x="50%" y="50%" width="50%" height="50%" fill="#ddd6fe" opacity="0.2" />
-                  
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  
-                  {/* 中央の十字線を太く */}
                   <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#94a3b8" strokeWidth="2" />
                   <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#94a3b8" strokeWidth="2" />
                   
@@ -499,9 +553,10 @@ function App() {
                     dataKey="technical" 
                     name="テクニカルスキル"
                     domain={[0, 4]}
-                    ticks={[0, 1, 2, 3, 4]}
-                    label={{ value: 'テクニカルスキル（分析力+知識） →', position: 'bottom', offset: 0 }}
-                    tick={{ fill: '#475569' }}
+                    label={{ value: 'テクニカルスキル（分析力+知識） →', position: 'bottom', offset: 90, style: { fontSize: 14, fill: '#475569' } }}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
                   <YAxis 
                     type="number" 
@@ -509,72 +564,98 @@ function App() {
                     name="ヒューマンスキル"
                     domain={[0, 4]}
                     ticks={[0, 1, 2, 3, 4]}
-                    label={{ value: 'ヒューマンスキル（実行力+対人力） ↑', angle: -90, position: 'center', offset: 0 }}
-                    tick={{ fill: '#475569' }}
+                    label={{ value: 'ヒューマンスキル（実行力+対人力） ↑', angle: -90, position: 'left', offset: 60, style: { fontSize: 14, fill: '#475569' } }}
+                    tick={{ fill: '#64748b', fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <ZAxis range={[400, 400]} />
+                  <ZAxis range={[2500, 2500]} />
                   
-                  {/* 象限ラベル - 薄い色で、シンプルに */}
-                  <text x="75%" y="25%" textAnchor="middle" fill="#991b1b" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                  <text x="75%" y="27%" textAnchor="middle" fill="#991b1b" fillOpacity="0.2" fontSize="16" fontWeight="600">
                     高テクニカル・高ヒューマン
                   </text>
                   
-                  <text x="25%" y="25%" textAnchor="middle" fill="#1e40af" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                  <text x="25%" y="27%" textAnchor="middle" fill="#1e40af" fillOpacity="0.2" fontSize="16" fontWeight="600">
                     低テクニカル・高ヒューマン
                   </text>
                   
-                  <text x="25%" y="75%" textAnchor="middle" fill="#c2410c" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                  <text x="25%" y="77%" textAnchor="middle" fill="#c2410c" fillOpacity="0.2" fontSize="16" fontWeight="600">
                     低テクニカル・低ヒューマン
                   </text>
                   
-                  <text x="75%" y="75%" textAnchor="middle" fill="#5b21b6" fillOpacity="0.2" fontSize="18" fontWeight="500">
+                  <text x="75%" y="77%" textAnchor="middle" fill="#5b21b6" fillOpacity="0.2" fontSize="16" fontWeight="600">
                     高テクニカル・低ヒューマン
                   </text>
                   
                   <Tooltip 
-                    cursor={{ strokeDasharray: '3 3' }}
+                    cursor={false}
                     content={({ payload }) => {
                       if (payload && payload.length > 0) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
-                            <p className="font-bold text-slate-800">{data.name}</p>
-                            <p className="text-sm text-slate-600">
-                              テクニカル: {data.technical}
-                            </p>
-                            <p className="text-sm text-slate-600">
-                              ヒューマン: {data.human}
-                            </p>
+                          <div className="bg-white p-4 rounded-lg shadow-xl border-2 border-slate-300">
+                            <p className="font-bold text-slate-800 text-lg mb-2">{data.name}</p>
+                            <div className="space-y-1 text-sm">
+                              <p className="text-slate-600">
+                                <span className="font-semibold">テクニカル:</span> {data.technical}
+                              </p>
+                              <p className="text-slate-600">
+                                <span className="font-semibold">ヒューマン:</span> {data.human}
+                              </p>
+                            </div>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Scatter data={calculateScatterData()} shape="circle">
+                 <Scatter 
+  data={calculateScatterData()} 
+  shape={(props) => {
+    const { cx, cy, fill, stroke, strokeWidth, strokeDasharray } = props;
+    const radius = 12; // ← ここでサイズ変更！
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={radius}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeDasharray={strokeDasharray}
+      />
+    );
+  }}
+>
                     {calculateScatterData().map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={entry.color}
-                        stroke={entry.type === 'ideal' ? '#64748b' : entry.color}
-                        strokeWidth={entry.type === 'ideal' ? 3 : 2}
-                        strokeDasharray={entry.type === 'ideal' ? '5 5' : '0'}
+                        fill={entry.type === 'ideal' ? 'transparent' : entry.color}
+                        stroke={entry.type === 'ideal' ? entry.color : '#ffffff'}
+                        strokeWidth={entry.type === 'ideal' ? 4 : 4}
+                        strokeDasharray={entry.type === 'ideal' ? '8 4' : '0'}
                       />
                     ))}
                   </Scatter>
                   <Legend 
-                    content={() => (
-                      <div className="flex flex-wrap justify-center gap-4 mt-4">
+  content={() => (
+    <div 
+      className="flex flex-wrap justify-center gap-4" 
+      style={{ 
+        position: 'absolute', 
+        bottom: '75px',  // 下から20pxの位置
+        left: '65%', 
+        transform: 'translateX(-50%)',
+        width: '100%'
+      }}
+    >
                         {calculateScatterData().map((entry, index) => (
-                          <div key={index} className="flex items-center gap-2">
+                          <div key={index} className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg">
                             <div 
-                              className="w-4 h-4 rounded-full"
-                              style={{ 
-                                backgroundColor: entry.color,
-                                border: entry.type === 'ideal' ? '2px dashed #64748b' : 'none'
-                              }}
+                              className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
+                              style={{ backgroundColor: entry.color }}
                             />
-                            <span className="text-sm text-slate-700">{entry.name}</span>
+                            <span className="text-sm font-medium text-slate-700">{entry.name}</span>
                           </div>
                         ))}
                       </div>
@@ -583,6 +664,19 @@ function App() {
                 </ScatterChart>
               </ResponsiveContainer>
             )}
+             <div className="hidden lg:block mt-16 pt-6 border-t border-slate-200 -mx-4">
+            <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+              📝 チーム全体のメモ
+              <span className="text-xs font-normal text-slate-500">（評価全体に関する気づきや方針など）</span>
+            </h3>
+            <textarea
+              value={teamMemo}
+              onChange={(e) => setTeamMemo(e.target.value)}
+              placeholder="例：今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
+              rows="30"
+            />
+          </div>
           </div>
 
           <div className="space-y-4">
