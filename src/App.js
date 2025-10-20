@@ -1089,6 +1089,32 @@ function App() {
                   </ScatterChart>
                 </ResponsiveContainer>
               )}
+
+<div className="hidden lg:block mt-16 pt-6 border-t border-slate-200 -mx-4">
+
+<h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+
+📝 チーム全体のメモ
+
+<span className="text-xs font-normal text-slate-500">（評価全体に関する気づきや方針など）</span>
+
+</h3>
+
+<textarea
+
+value={teamMemo}
+
+onChange={(e) => setTeamMemo(e.target.value)}
+
+placeholder="例：今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
+
+className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
+
+rows="30"
+
+/>
+
+</div>
             </div>
 
             <div className="space-y-3">
