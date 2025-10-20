@@ -161,7 +161,7 @@ function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleE
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-white rounded-xl shadow-lg pt-4 pb-1 px-4 md:px-6">
+    <div ref={setNodeRef} style={style} className="bg-white rounded-xl shadow-lg pt-2 pb-1 px-2 md:pt-4 md:px-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           <div 
@@ -915,7 +915,7 @@ function App() {
       <MobileMenu viewMode={viewMode} setViewMode={setViewMode} isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
       <div className="w-full max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-0">
-        <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
+      <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl md:text-4xl font-bold text-slate-800 mb-2 md:mb-3">
@@ -984,18 +984,18 @@ function App() {
             </div>
           )}
           
-          <div className="bg-blue-50 border-l-4 border-blue-500 p-3 md:p-4 rounded mb-4 md:mb-6">
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-2 md:p-4 rounded mb-3 md:mb-6">
             <p className="text-xs md:text-sm text-slate-700">
               <strong>💡 ヒント:</strong> <kbd className="px-2 py-0.5 bg-white border border-slate-300 rounded text-xs">?</kbd> キーでショートカット一覧を表示
             </p>
           </div>
 
           {/* 能力評価基準（折りたたみ可能） */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg mb-6 overflow-hidden">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg mb-4 md:mb-6 overflow-hidden">
             {/* ヘッダー部分（クリックで全体を折りたたみ） */}
             <button
               onClick={() => setShowCriteria(!showCriteria)}
-              className="w-full p-4 flex items-center justify-between hover:bg-slate-100 transition-colors"
+              className="w-full p-3 md:p-4 flex items-center justify-between hover:bg-slate-100 transition-colors"
             >
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 📋 能力評価基準
@@ -1010,7 +1010,7 @@ function App() {
             
             {/* 展開時のみ表示 */}
             {showCriteria && (
-              <div className="p-4 border-t border-slate-200">
+              <div className="p-3 md:p-4 border-t border-slate-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {Object.entries(competencyCriteria).map(([key, competency]) => (
                     <div key={key} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -1019,7 +1019,7 @@ function App() {
                           ...prev,
                           [key]: !prev[key]
                         }))}
-                        className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                        className="w-full p-2 md:p-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
                       >
                         <span className="font-semibold text-slate-800 text-sm">
                           {competency.name}
@@ -1032,7 +1032,7 @@ function App() {
                       </button>
                       
                       {expandedCriteria[key] && (
-                        <div className="px-3 pb-3 border-t border-slate-200 bg-slate-50">
+                        <div className="px-2 pb-2 md:px-3 md:pb-3 border-t border-slate-200 bg-slate-50">
                           <div className="space-y-2 mt-2">
                             {Object.entries(competency.levels).map(([level, description]) => (
                               <div key={level} className="flex gap-2">
@@ -1088,7 +1088,7 @@ function App() {
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-3 items-center mb-6">
+          <div className="flex flex-wrap gap-2 md:gap-3 items-center mb-4 md:mb-6">
             <button
               onClick={addEmployee}
               className="px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
@@ -1131,7 +1131,7 @@ function App() {
         {viewMode === 'current' && (
           <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 md:gap-8 mb-4 md:mb-8">
            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 pb-8 md:pb-24 w-full overflow-hidden" ref={chartRef}>
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-3 md:p-4 rounded mb-4 md:mb-6">
+           <div className="bg-blue-50 border-l-4 border-blue-500 p-2 md:p-4 rounded mb-3 md:mb-6">
                 <p className="text-xs md:text-sm text-slate-700 font-semibold mb-2">
                   💾 評価を履歴として保存
                 </p>
@@ -1297,7 +1297,7 @@ rows="25"
 
             <div className="space-y-3">
               {showIdeal && (
-                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-lg pt-3 pb-0 px-4 md:px-6 border-2 border-slate-300">
+                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-lg pt-2 pb-0 px-2 md:pt-3 md:px-6 border-2 border-slate-300">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2 md:gap-3">
                       <button onClick={() => setIdealProfile(prev => ({ ...prev, isExpanded: !prev.isExpanded }))} className="p-1 hover:bg-slate-100 rounded">
@@ -1361,7 +1361,7 @@ rows="25"
 
 {/* 履歴比較ビュー */}
         {viewMode === 'compare' && (
-          <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
+          <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
               <ArrowLeftRight className="w-6 h-6" />
               履歴比較
@@ -1482,7 +1482,7 @@ rows="25"
 
         {/* 時系列比較ビュー */}
         {viewMode === 'comparison' && (
-          <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
+          <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
             <h2 className="text-xl font-bold text-slate-800 mb-4">📈 成長トレンド分析</h2>
             {evaluationHistory.length === 0 ? (
               <div className="text-center py-12 text-slate-500">
@@ -1553,7 +1553,7 @@ rows="25"
 
         {/* チーム分析ダッシュボード */}
         {viewMode === 'dashboard' && (
-          <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
+          <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
             <h2 className="text-xl font-bold text-slate-800 mb-4">📊 チーム全体の分析</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
