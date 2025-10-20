@@ -914,7 +914,7 @@ function App() {
       <KeyboardShortcutsModal isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
       <MobileMenu viewMode={viewMode} setViewMode={setViewMode} isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
-      <div className="max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-2 md:px-0">
+      <div className="max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-1 md:px-0">
         <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
@@ -1190,7 +1190,12 @@ function App() {
                 </ResponsiveContainer>
               ) : (
                 <ResponsiveContainer width="100%" height={400} className="md:h-[500px]">
-                  <ScatterChart margin={{ top: 10, right: 10, bottom: -90, left: -70 }}>
+                   <ScatterChart margin={{ 
+                    top: 10, 
+                    right: window.innerWidth < 768 ? 5 : 55, 
+                    bottom: window.innerWidth < 768 ? -30 : -90, 
+                    left: window.innerWidth < 768 ? -25 : -55 
+                  }}>
                     <rect x="50%" y="0" width="50%" height="50%" fill="#fecaca" opacity="0.12" />
                     <rect x="0" y="0" width="50%" height="50%" fill="#bfdbfe" opacity="0.12" />
                     <rect x="0" y="50%" width="50%" height="50%" fill="#fed7aa" opacity="0.12" />
