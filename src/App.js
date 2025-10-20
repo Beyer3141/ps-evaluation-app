@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, Cell, LineChart, Line, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { ChevronDown, ChevronUp, Download, Upload, Save, Wifi, WifiOff, History, Calendar, TrendingUp, Users, Check, X, Clock, Menu, ArrowLeftRight, Image, FileText, Keyboard } from 'lucide-react';
@@ -517,6 +517,22 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const employeesForSave = useMemo(() => 
+    JSON.stringify(employees.map(emp => ({
+      id: emp.id,
+      name: emp.name,
+      color: emp.color,
+      scores: emp.scores,
+      memo: emp.memo
+    }))), 
+    [employees]
+  );
+
+  const idealProfileForSave = useMemo(() => {
+    const { isExpanded, ...saveData } = idealProfile;
+    return JSON.stringify(saveData);
+  }, [idealProfile]);
+
   useEffect(() => {
     if (lastSaved === null) return;
     setHasUnsavedChanges(true);
@@ -527,7 +543,7 @@ function App() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [employees, idealProfile, selectedEmployees, showIdeal, teamMemo]);
+  }, [employeesForSave, idealProfileForSave, selectedEmployees, showIdeal, teamMemo]);
 
   const loadFromSupabase = async () => {
     try {
