@@ -337,6 +337,7 @@ function App() {
   const chartRef = useRef(null);
   const autoSaveTimerRef = useRef(null);
   const [expandedCriteria, setExpandedCriteria] = useState({});
+  const [showCriteria, setShowCriteria] = useState(false);
 
   const competencyNames = {
     dataAnalysis: "データ分析力", hypothesis: "仮説思考力", questioning: "質問力・ヒアリング力",
@@ -989,50 +990,68 @@ function App() {
             </p>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-              📋 能力評価基準
-              <span className="text-xs font-normal text-slate-500">（クリックで詳細を表示）</span>
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {Object.entries(competencyCriteria).map(([key, competency]) => (
-                <div key={key} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                  <button
-                    onClick={() => setExpandedCriteria(prev => ({
-                      ...prev,
-                      [key]: !prev[key]
-                    }))}
-                    className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
-                  >
-                    <span className="font-semibold text-slate-800 text-sm">
-                      {competency.name}
-                    </span>
-                    <ChevronDown 
-                      className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${
-                        expandedCriteria[key] ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </button>
-                  
-                  {expandedCriteria[key] && (
-                    <div className="px-3 pb-3 border-t border-slate-200 bg-slate-50">
-                      <div className="space-y-2 mt-2">
-                        {Object.entries(competency.levels).map(([level, description]) => (
-                          <div key={level} className="flex gap-2">
-                            <span className="font-bold text-blue-600 text-xs flex-shrink-0">
-                              Lv.{level}
-                            </span>
-                            <span className="text-xs text-slate-700">
-                              {description}
-                            </span>
+          {/* 能力評価基準（折りたたみ可能） */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg mb-6 overflow-hidden">
+            {/* ヘッダー部分（クリックで全体を折りたたみ） */}
+            <button
+              onClick={() => setShowCriteria(!showCriteria)}
+              className="w-full p-4 flex items-center justify-between hover:bg-slate-100 transition-colors"
+            >
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                📋 能力評価基準
+                <span className="text-xs font-normal text-slate-500">（クリックで展開/折りたたみ）</span>
+              </h3>
+              <ChevronDown 
+                className={`w-5 h-5 text-slate-600 transition-transform ${
+                  showCriteria ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+            
+            {/* 展開時のみ表示 */}
+            {showCriteria && (
+              <div className="p-4 border-t border-slate-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {Object.entries(competencyCriteria).map(([key, competency]) => (
+                    <div key={key} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                      <button
+                        onClick={() => setExpandedCriteria(prev => ({
+                          ...prev,
+                          [key]: !prev[key]
+                        }))}
+                        className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors text-left"
+                      >
+                        <span className="font-semibold text-slate-800 text-sm">
+                          {competency.name}
+                        </span>
+                        <ChevronDown 
+                          className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${
+                            expandedCriteria[key] ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                      
+                      {expandedCriteria[key] && (
+                        <div className="px-3 pb-3 border-t border-slate-200 bg-slate-50">
+                          <div className="space-y-2 mt-2">
+                            {Object.entries(competency.levels).map(([level, description]) => (
+                              <div key={level} className="flex gap-2">
+                                <span className="font-bold text-blue-600 text-xs flex-shrink-0">
+                                  Lv.{level}
+                                </span>
+                                <span className="text-xs text-slate-700">
+                                  {description}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
           
           <div className="hidden md:flex gap-2 bg-slate-100 p-1 rounded-lg mb-6">
