@@ -896,7 +896,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-8 pb-20 md:pb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-8 pb-20 md:pb-8 overflow-x-hidden">
       <style>{`
         @keyframes slide-in {
           from { transform: translateY(-100%); opacity: 0; }
@@ -914,7 +914,7 @@ function App() {
       <KeyboardShortcutsModal isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
       <MobileMenu viewMode={viewMode} setViewMode={setViewMode} isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
-      <div className="max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-1 md:px-0">
+      <div className="w-full max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-0">
         <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
@@ -1129,8 +1129,8 @@ function App() {
         </div>
 
         {viewMode === 'current' && (
-          <div className="grid lg:grid-cols-2 gap-4 md:gap-8 mb-4 md:mb-8">
-            <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 pb-8 md:pb-24" ref={chartRef}>
+          <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 md:gap-8 mb-4 md:mb-8">
+           <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 pb-8 md:pb-24 w-full overflow-hidden" ref={chartRef}>
               <div className="bg-blue-50 border-l-4 border-blue-500 p-3 md:p-4 rounded mb-4 md:mb-6">
                 <p className="text-xs md:text-sm text-slate-700 font-semibold mb-2">
                   💾 評価を履歴として保存
@@ -1174,6 +1174,7 @@ function App() {
               )}
               
               {chartType === 'radar' ? (
+                 <div className="w-full overflow-hidden">
                 <ResponsiveContainer width="100%" height={400} className="md:h-[500px]">
                   <RadarChart data={prepareChartData()}>
                     <PolarGrid stroke="#cbd5e1" />
@@ -1188,7 +1189,9 @@ function App() {
                     <Legend />
                   </RadarChart>
                 </ResponsiveContainer>
+                </div>
               ) : (
+                <div className="w-full overflow-hidden">
                 <ResponsiveContainer width="100%" height={400} className="md:h-[500px]">
                    <ScatterChart margin={{ 
                     top: 10, 
@@ -1262,6 +1265,7 @@ function App() {
                     )} />
                   </ScatterChart>
                 </ResponsiveContainer>
+                </div>
               )}
 
 <div className="hidden lg:block mt-16 pt-6 border-t border-slate-200 -mx-4">
@@ -1586,7 +1590,7 @@ rows="25"
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
               <div className="bg-green-50 rounded-lg p-4 md:p-6">
                 <h3 className="font-bold text-green-800 mb-3 md:mb-4">💪 チームの強み TOP3</h3>
-                <div className="space-y-2 md:space-y-3">
+                <div className="space-y-2 md:space-y-3 w-full">
                   {topStrengths.map(([key, stat], index) => (
                     <div key={key} className="flex items-center justify-between bg-white p-2 md:p-3 rounded">
                       <div>
@@ -1605,7 +1609,7 @@ rows="25"
 
               <div className="bg-orange-50 rounded-lg p-4 md:p-6">
                 <h3 className="font-bold text-orange-800 mb-3 md:mb-4">📌 強化すべき領域 TOP3</h3>
-                <div className="space-y-2 md:space-y-3">
+                <div className="space-y-2 md:space-y-3 w-full">
                   {bottomWeaknesses.map(([key, stat], index) => (
                     <div key={key} className="flex items-center justify-between bg-white p-2 md:p-3 rounded">
                       <div>
