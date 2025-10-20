@@ -914,7 +914,7 @@ function App() {
       <KeyboardShortcutsModal isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
       <MobileMenu viewMode={viewMode} setViewMode={setViewMode} isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
-      <div className="max-w-[90%] md:max-w-[80%] mx-auto">
+      <div className="max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-2 md:px-0">
         <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-4 md:mb-8">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
