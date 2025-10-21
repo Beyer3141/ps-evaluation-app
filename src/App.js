@@ -229,22 +229,31 @@ function SortableEmployeeCard({
     <Card
       ref={setNodeRef}
       style={style}
+      elevation={0}
       sx={{
         mb: 2,
-        transition: 'box-shadow 0.3s',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 3,
+        transition: 'all 0.3s',
         '&:hover': {
-          boxShadow: 6,
+          boxShadow: 4,
+          borderColor: 'primary.light',
         }
       }}
     >
-      <CardContent>
+      <CardContent sx={{ p: 2.5 }}>
         {/* ヘッダー */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <IconButton
             {...attributes}
             {...listeners}
             size="small"
-            sx={{ cursor: 'grab', '&:active': { cursor: 'grabbing' } }}
+            sx={{ 
+              cursor: 'grab', 
+              '&:active': { cursor: 'grabbing' },
+              color: 'text.secondary'
+            }}
           >
             <DragIcon />
           </IconButton>
@@ -256,20 +265,21 @@ function SortableEmployeeCard({
                 employee.id === emp.id ? { ...employee, isExpanded: !employee.isExpanded } : employee
               ));
             }}
+            sx={{ color: 'text.secondary' }}
           >
             {emp.isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </IconButton>
-
+  
           <Box
             sx={{
-              width: 16,
-              height: 16,
+              width: 12,
+              height: 12,
               borderRadius: '50%',
               bgcolor: emp.color,
               flexShrink: 0,
             }}
           />
-
+  
           <TextField
             value={emp.name}
             onChange={(e) => {
@@ -282,66 +292,69 @@ function SortableEmployeeCard({
             sx={{
               flex: 1,
               '& .MuiInput-input': {
-                fontSize: '1.25rem',
-                fontWeight: 700,
+                fontSize: '1.1rem',
+                fontWeight: 600,
               }
             }}
           />
-
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              variant={selectedEmployees.includes(emp.id) ? 'contained' : 'outlined'}
-              onClick={() => toggleEmployee(emp.id)}
-              startIcon={selectedEmployees.includes(emp.id) ? <VisibilityIcon /> : <VisibilityOffIcon />}
-            >
-              {selectedEmployees.includes(emp.id) ? '表示中' : '非表示'}
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              onClick={() => removeEmployee(emp.id)}
-              startIcon={<DeleteIcon />}
-            >
-              削除
-            </Button>
-          </Stack>
+  
+          <Chip 
+            label={calculateAverage(emp.scores)} 
+            size="small" 
+            color="primary"
+            sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+          />
+  
+          <IconButton
+            size="small"
+            onClick={() => toggleEmployee(emp.id)}
+            sx={{ 
+              color: selectedEmployees.includes(emp.id) ? 'primary.main' : 'text.secondary'
+            }}
+          >
+            {selectedEmployees.includes(emp.id) ? <VisibilityIcon /> : <VisibilityOffIcon />}
+          </IconButton>
+  
+          <IconButton
+            size="small"
+            color="error"
+            onClick={() => removeEmployee(emp.id)}
+          >
+            <DeleteIcon />
+          </IconButton>
         </Box>
-
+  
         {/* 統計情報 */}
-        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-          <Paper variant="outlined" sx={{ px: 2, py: 1, borderRadius: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              平均スコア
-            </Typography>
-            <Typography variant="h5" fontWeight={700}>
-              {calculateAverage(emp.scores)}
-            </Typography>
-          </Paper>
-
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" color="success.main" sx={{ display: 'block', mb: 0.5 }}>
-              <strong>強み:</strong> {strengths.map(s => s.name).join(', ')}
-            </Typography>
-            <Typography variant="caption" color="warning.main">
-              <strong>課題:</strong> {weaknesses.map(w => w.name).join(', ')}
-            </Typography>
-          </Box>
+        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }} useFlexGap>
+          <Chip 
+            label={`強み: ${strengths.map(s => s.name).join(', ')}`}
+            size="small"
+            color="success"
+            variant="outlined"
+            sx={{ fontSize: '0.75rem' }}
+          />
+          <Chip 
+            label={`課題: ${weaknesses.map(w => w.name).join(', ')}`}
+            size="small"
+            color="warning"
+            variant="outlined"
+            sx={{ fontSize: '0.75rem' }}
+          />
         </Stack>
-
+  
         {/* 展開時の詳細 */}
         <Collapse in={emp.isExpanded}>
           <Divider sx={{ my: 2 }} />
-          <Grid container spacing={2}>
+          <Grid container spacing={1.5}>
             {Object.entries(competencyNames).map(([key, name]) => (
-              <Grid item xs={12} sm={6} key={key}>
+              <Grid item xs={6} key={key}>
                 <FormControl fullWidth size="small">
-                  <InputLabel>{name}</InputLabel>
+                  <InputLabel sx={{ fontSize: '0.875rem' }}>{name}</InputLabel>
                   <Select
                     value={emp.scores[key]}
                     label={name}
                     onChange={(e) => handleScoreChange(emp.id, key, e.target.value)}
+                    sx={{ borderRadius: 2 }}
                   >
                     {[1, 2, 3, 4, 5].map(level => (
                       <MenuItem key={level} value={level}>
@@ -353,7 +366,7 @@ function SortableEmployeeCard({
               </Grid>
             ))}
           </Grid>
-
+  
           <TextField
             fullWidth
             multiline
@@ -361,7 +374,12 @@ function SortableEmployeeCard({
             placeholder="メモを追加..."
             value={emp.memo || ''}
             onChange={(e) => handleEmployeeMemoChange(emp.id, e.target.value)}
-            sx={{ mt: 2 }}
+            sx={{ 
+              mt: 2,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+              }
+            }}
           />
         </Collapse>
       </CardContent>
@@ -587,90 +605,112 @@ function MainLayout({ children, viewMode, setViewMode }) {
   ];
 
   // サイドバーコンテンツ
-  const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* ロゴ・タイトル */}
-      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+const drawer = (
+  <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
+    {/* ロゴ・タイトル */}
+    <Box sx={{ p: 3, pb: 2 }}>
+      <Stack direction="row" spacing={2} alignItems="center">
+        <Avatar 
+          sx={{ 
+            bgcolor: 'primary.main', 
+            width: 48, 
+            height: 48,
+            fontSize: '1.25rem',
+            fontWeight: 700
+          }}
+        >
           PS
         </Avatar>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, mb: 0.5 }}>
             PS能力評価
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            v1.0.0
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+            Professional Skills
           </Typography>
         </Box>
-      </Box>
+      </Stack>
+    </Box>
 
-      <Divider />
+    <Divider />
 
-      {/* ナビゲーションメニュー */}
-      <List sx={{ flex: 1, px: 2, py: 1 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
-            <ListItemButton
-              selected={viewMode === item.id}
-              onClick={() => {
-                setViewMode(item.id);
-                if (isMobile) setMobileOpen(false);
-              }}
-              sx={{
-                borderRadius: 2,
-                '&.Mui-selected': {
-                  bgcolor: 'primary.main',
-                  color: 'primary.contrastText',
-                  '&:hover': {
-                    bgcolor: 'primary.dark',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.contrastText',
-                  },
-                },
+    {/* ナビゲーションメニュー */}
+    <List sx={{ flex: 1, px: 2, py: 2 }}>
+      {menuItems.map((item) => (
+        <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+          <ListItemButton
+            selected={viewMode === item.id}
+            onClick={() => {
+              setViewMode(item.id);
+              if (isMobile) setMobileOpen(false);
+            }}
+            sx={{
+              borderRadius: 3,
+              py: 1.5,
+              px: 2,
+              minHeight: 56,
+              '&.Mui-selected': {
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
                 '&:hover': {
-                  bgcolor: 'action.hover',
+                  bgcolor: 'primary.dark',
                 },
+                '& .MuiListItemIcon-root': {
+                  color: 'primary.contrastText',
+                },
+              },
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+              transition: 'all 0.2s',
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                color: viewMode === item.id ? 'inherit' : 'text.secondary',
+                minWidth: 48,
+                '& .MuiSvgIcon-root': {
+                  fontSize: '1.75rem'
+                }
               }}
             >
-              <ListItemIcon
-                sx={{
-                  color: viewMode === item.id ? 'inherit' : 'text.secondary',
-                  minWidth: 40,
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                primaryTypographyProps={{
-                  fontSize: '0.875rem',
-                  fontWeight: viewMode === item.id ? 600 : 400,
-                }}
-              />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-
-      <Divider />
-
-      {/* 設定ボタン */}
-      <List sx={{ px: 2, py: 1 }}>
-        <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2 }}>
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              <SettingsIcon />
+              {item.icon}
             </ListItemIcon>
             <ListItemText
-              primary="設定"
-              primaryTypographyProps={{ fontSize: '0.875rem' }}
+              primary={item.label}
+              primaryTypographyProps={{
+                fontSize: '0.95rem',
+                fontWeight: viewMode === item.id ? 600 : 500,
+              }}
             />
           </ListItemButton>
         </ListItem>
-      </List>
+      ))}
+    </List>
+
+    <Divider />
+
+    {/* 設定ボタン */}
+    <Box sx={{ p: 2 }}>
+      <ListItemButton 
+        sx={{ 
+          borderRadius: 3,
+          py: 1.5,
+          px: 2,
+          minHeight: 56,
+        }}
+      >
+        <ListItemIcon sx={{ minWidth: 48 }}>
+          <SettingsIcon sx={{ fontSize: '1.75rem' }} />
+        </ListItemIcon>
+        <ListItemText
+          primary="設定"
+          primaryTypographyProps={{ fontSize: '0.95rem', fontWeight: 500 }}
+        />
+      </ListItemButton>
     </Box>
-  );
+  </Box>
+);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -1359,343 +1399,430 @@ function App() {
 
           {/* 現在の評価ビュー */}
           {viewMode === 'current' && (
-            <Grid container spacing={3}>
-              {/* チャート表示エリア */}
-              <Grid item xs={12} lg={6}>
-                <Card ref={chartRef}>
-                  <CardContent>
-                    {/* 履歴保存セクション */}
-                    <Alert severity="info" sx={{ mb: 3 }}>
-                      <AlertTitle><strong>💾 評価を履歴として保存</strong></AlertTitle>
-                      <Stack spacing={2} sx={{ mt: 2 }}>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              fullWidth
-                              label="評価日"
-                              type="date"
-                              value={newEvaluationDate}
-                              onChange={(e) => setNewEvaluationDate(e.target.value)}
-                              InputLabelProps={{ shrink: true }}
-                              size="small"
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              fullWidth
-                              label="メモ（任意）"
-                              placeholder="例: Q1評価"
-                              value={newEvaluationMemo}
-                              onChange={(e) => setNewEvaluationMemo(e.target.value)}
-                              size="small"
-                            />
-                          </Grid>
-                        </Grid>
-                        <Button
-                          variant="contained"
-                          onClick={saveAsHistory}
-                          fullWidth
-                        >
-                          履歴に保存
-                        </Button>
-                      </Stack>
-                    </Alert>
-
-                    <Typography variant="h4" gutterBottom>
-                      {chartType === 'radar' ? '能力レーダーチャート' : '能力マトリクス表'}
-                    </Typography>
-                    
-                    {chartType === 'scatter' && (
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        横軸: テクニカルスキル / 縦軸: ヒューマンスキル
-                      </Typography>
-                    )}
-
-                    <Box sx={{ width: '100%', height: { xs: 400, md: 500 }, mb: 2 }}>
-                      {chartType === 'radar' ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={prepareChartData()}>
-                            <PolarGrid stroke="#cbd5e1" />
-                            <PolarAngleAxis 
-                              dataKey="competency" 
-                              tick={{ fill: '#475569', fontSize: 11 }} 
-                            />
-                            <PolarRadiusAxis 
-                              angle={90} 
-                              domain={[0, 5]} 
-                              tick={{ fill: '#64748b' }} 
-                              tickCount={6} 
-                            />
-                            {showIdeal && (
-                              <Radar 
-                                name="理想" 
-                                dataKey="理想" 
-                                stroke="#94a3b8" 
-                                fill="#94a3b8" 
-                                fillOpacity={0.1} 
-                                strokeWidth={2} 
-                                strokeDasharray="5 5" 
-                              />
-                            )}
-                            {employees.filter(emp => selectedEmployees.includes(emp.id)).map(emp => (
-                              <Radar 
-                                key={emp.id} 
-                                name={emp.name} 
-                                dataKey={emp.name} 
-                                stroke={emp.color} 
-                                fill={emp.color} 
-                                fillOpacity={0.3} 
-                                strokeWidth={2} 
-                              />
-                            ))}
-                            <Legend />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ScatterChart margin={{ top: 20, right: 60, bottom: 40, left: 60 }}>
-                            <XAxis 
-                              type="number" 
-                              dataKey="technical" 
-                              name="テクニカル" 
-                              domain={[0, 5]} 
-                              tick={{ fill: '#64748b' }} 
-                            />
-                            <YAxis 
-                              type="number" 
-                              dataKey="human" 
-                              name="ヒューマン" 
-                              domain={[0, 5]} 
-                              tick={{ fill: '#64748b' }} 
-                            />
-                            <ZAxis range={[1500, 1500]} />
-                            <Tooltip 
-                              cursor={false} 
-                              content={({ payload }) => {
-                                if (payload && payload.length > 0) {
-                                  const data = payload[0].payload;
-                                  return (
-                                    <Paper sx={{ p: 2 }}>
-                                      <Typography variant="subtitle2" fontWeight={700}>
-                                        {data.name}
-                                      </Typography>
-                                      <Typography variant="caption" display="block">
-                                        テクニカル: {data.technical}
-                                      </Typography>
-                                      <Typography variant="caption" display="block">
-                                        ヒューマン: {data.human}
-                                      </Typography>
-                                    </Paper>
-                                  );
-                                }
-                                return null;
-                              }} 
-                            />
-                            <Scatter 
-                              data={calculateScatterData()} 
-                              shape={(props) => {
-                                const { cx, cy, fill, stroke } = props;
-                                return <circle cx={cx} cy={cy} r={12} fill={fill} stroke="#fff" strokeWidth={3} />;
-                              }}
-                            >
-                              {calculateScatterData().map((entry) => (
-                                <Cell 
-                                  key={`cell-${entry.id}`} 
-                                  fill={entry.type === 'ideal' ? 'transparent' : entry.color} 
-                                  stroke={entry.type === 'ideal' ? entry.color : '#ffffff'} 
-                                  strokeWidth={4} 
-                                  strokeDasharray={entry.type === 'ideal' ? '8 4' : '0'} 
-                                />
-                              ))}
-                            </Scatter>
-                            <Legend content={() => (
-                              <Box sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 1, mt: 2 }}>
-                                {calculateScatterData().map((entry) => (
-                                  <Chip
-                                    key={entry.id}
-                                    label={entry.name}
-                                    size="small"
-                                    sx={{
-                                      bgcolor: `${entry.color}20`,
-                                      borderColor: entry.color,
-                                      borderWidth: 2,
-                                      borderStyle: 'solid',
-                                    }}
-                                  />
-                                ))}
-                              </Box>
-                            )} />
-                          </ScatterChart>
-                        </ResponsiveContainer>
-                      )}
-                    </Box>
-
-                    <Box sx={{ display: { xs: 'none', lg: 'block' }, mt: 4 }}>
-                      <Divider sx={{ my: 3 }} />
-                      <Typography variant="h6" gutterBottom>
-                        📝 チーム全体のメモ
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                        評価全体に関する気づきや方針など
-                      </Typography>
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={10}
-                        placeholder="例：今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
-                        value={teamMemo}
-                        onChange={(e) => setTeamMemo(e.target.value)}
-                      />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* メンバーリストエリア */}
-              <Grid item xs={12} lg={6}>
-                <Stack spacing={2} sx={{ mb: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Typography variant="h6">
-                      メンバー管理
-                    </Typography>
-                    <Chip 
-                      label={`${employees.length}人`} 
-                      color="primary" 
-                      size="small" 
-                    />
-                  </Stack>
-
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(selectedEmployees.length / employees.length) * 100} 
-                    sx={{ height: 8, borderRadius: 1 }}
+  <Grid container spacing={3}>
+    {/* 左側: チャート表示エリア */}
+    <Grid item xs={12} lg={7}>
+      <Stack spacing={3}>
+        {/* 履歴保存セクション */}
+        <Card 
+          elevation={0}
+          sx={{ 
+            border: '1px solid',
+            borderColor: 'info.light',
+            borderRadius: 3,
+            bgcolor: 'info.50'
+          }}
+        >
+          <CardContent>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+              <CalendarIcon color="info" />
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                評価を履歴として保存
+              </Typography>
+            </Stack>
+            <Stack spacing={2}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="評価日"
+                    type="date"
+                    value={newEvaluationDate}
+                    onChange={(e) => setNewEvaluationDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    size="small"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                      }
+                    }}
                   />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="メモ（任意）"
+                    placeholder="例: Q1評価"
+                    value={newEvaluationMemo}
+                    onChange={(e) => setNewEvaluationMemo(e.target.value)}
+                    size="small"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                      }
+                    }}
+                  />
+                </Grid>
+              </Grid>
+              <Button
+                variant="contained"
+                onClick={saveAsHistory}
+                fullWidth
+                sx={{ borderRadius: 2, py: 1.25 }}
+              >
+                履歴に保存
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
 
-                  {/* 能力評価基準 */}
-                  <Accordion 
-                    expanded={showCriteria}
-                    onChange={() => setShowCriteria(!showCriteria)}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography variant="h6">
-                        📋 能力評価基準
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Grid container spacing={2}>
-                        {Object.entries(competencyCriteria).map(([key, competency]) => (
-                          <Grid item xs={12} md={6} key={key}>
-                            <Accordion>
-                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Typography fontWeight={600}>
-                                  {competency.name}
-                                </Typography>
-                              </AccordionSummary>
-                              <AccordionDetails>
-                                <Stack spacing={1}>
-                                  {Object.entries(competency.levels).map(([level, description]) => (
-                                    <Box key={level} sx={{ display: 'flex', gap: 1 }}>
-                                      <Chip 
-                                        label={`Lv.${level}`} 
-                                        size="small" 
-                                        color="primary"
-                                        sx={{ minWidth: 50 }}
-                                      />
-                                      <Typography variant="body2">
-                                        {description}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                                </Stack>
-                              </AccordionDetails>
-                            </Accordion>
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </AccordionDetails>
-                  </Accordion>
-                </Stack>
+        {/* チャートカード */}
+        <Card 
+          ref={chartRef}
+          elevation={0}
+          sx={{ 
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 3,
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+              {chartType === 'radar' ? '能力レーダーチャート' : '能力マトリクス'}
+            </Typography>
+            
+            {chartType === 'scatter' && (
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                横軸: テクニカルスキル / 縦軸: ヒューマンスキル
+              </Typography>
+            )}
 
-                {/* 理想形カード */}
-                {showIdeal && (
-                  <Card sx={{ mb: 2, bgcolor: 'grey.100' }}>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => setIdealProfile(prev => ({ ...prev, isExpanded: !prev.isExpanded }))}
-                        >
-                          {idealProfile.isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                        </IconButton>
-                        <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'grey.400' }} />
-                        <Typography variant="h6">理想形（目標レベル）</Typography>
-                      </Box>
-
-                      <Paper variant="outlined" sx={{ px: 2, py: 1, display: 'inline-block', mb: 2 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          平均スコア
-                        </Typography>
-                        <Typography variant="h5" fontWeight={700}>
-                          {calculateAverage(idealProfile)}
-                        </Typography>
-                      </Paper>
-
-                      <Collapse in={idealProfile.isExpanded}>
-                        <Grid container spacing={2}>
-                          {Object.entries(competencyNames).map(([key, name]) => (
-                            <Grid item xs={12} sm={6} key={key}>
-                              <FormControl fullWidth size="small">
-                                <InputLabel>{name}</InputLabel>
-                                <Select
-                                  value={idealProfile[key]}
-                                  label={name}
-                                  onChange={(e) => handleIdealChange(key, e.target.value)}
-                                >
-                                  {[1, 2, 3, 4, 5].map(level => (
-                                    <MenuItem key={level} value={level}>
-                                      Lv.{level}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Collapse>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* メンバーカードリスト */}
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={employees.map(emp => emp.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {employees.map(emp => (
-                      <SortableEmployeeCard
-                        key={emp.id}
-                        emp={emp}
-                        competencyNames={competencyNames}
-                        selectedEmployees={selectedEmployees}
-                        toggleEmployee={toggleEmployee}
-                        removeEmployee={removeEmployee}
-                        handleScoreChange={handleScoreChange}
-                        handleEmployeeMemoChange={handleEmployeeMemoChange}
-                        calculateAverage={calculateAverage}
-                        getStrengthsAndWeaknesses={getStrengthsAndWeaknesses}
-                        setEmployees={setEmployees}
+            <Box sx={{ width: '100%', height: { xs: 400, md: 500 }, mt: 2 }}>
+              {chartType === 'radar' ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={prepareChartData()}>
+                    <PolarGrid stroke="#cbd5e1" />
+                    <PolarAngleAxis 
+                      dataKey="competency" 
+                      tick={{ fill: '#475569', fontSize: 11 }} 
+                    />
+                    <PolarRadiusAxis 
+                      angle={90} 
+                      domain={[0, 5]} 
+                      tick={{ fill: '#64748b' }} 
+                      tickCount={6} 
+                    />
+                    {showIdeal && (
+                      <Radar 
+                        name="理想" 
+                        dataKey="理想" 
+                        stroke="#94a3b8" 
+                        fill="#94a3b8" 
+                        fillOpacity={0.1} 
+                        strokeWidth={2} 
+                        strokeDasharray="5 5" 
+                      />
+                    )}
+                    {employees.filter(emp => selectedEmployees.includes(emp.id)).map(emp => (
+                      <Radar 
+                        key={emp.id} 
+                        name={emp.name} 
+                        dataKey={emp.name} 
+                        stroke={emp.color} 
+                        fill={emp.color} 
+                        fillOpacity={0.3} 
+                        strokeWidth={2} 
                       />
                     ))}
-                  </SortableContext>
-                </DndContext>
+                    <Legend />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 20, right: 60, bottom: 40, left: 60 }}>
+                    <XAxis 
+                      type="number" 
+                      dataKey="technical" 
+                      name="テクニカル" 
+                      domain={[0, 5]} 
+                      tick={{ fill: '#64748b' }} 
+                    />
+                    <YAxis 
+                      type="number" 
+                      dataKey="human" 
+                      name="ヒューマン" 
+                      domain={[0, 5]} 
+                      tick={{ fill: '#64748b' }} 
+                    />
+                    <ZAxis range={[1500, 1500]} />
+                    <Tooltip 
+                      cursor={false} 
+                      content={({ payload }) => {
+                        if (payload && payload.length > 0) {
+                          const data = payload[0].payload;
+                          return (
+                            <Paper sx={{ p: 2 }}>
+                              <Typography variant="subtitle2" fontWeight={700}>
+                                {data.name}
+                              </Typography>
+                              <Typography variant="caption" display="block">
+                                テクニカル: {data.technical}
+                              </Typography>
+                              <Typography variant="caption" display="block">
+                                ヒューマン: {data.human}
+                              </Typography>
+                            </Paper>
+                          );
+                        }
+                        return null;
+                      }} 
+                    />
+                    <Scatter 
+                      data={calculateScatterData()} 
+                      shape={(props) => {
+                        const { cx, cy, fill, stroke } = props;
+                        return <circle cx={cx} cy={cy} r={12} fill={fill} stroke="#fff" strokeWidth={3} />;
+                      }}
+                    >
+                      {calculateScatterData().map((entry) => (
+                        <Cell 
+                          key={`cell-${entry.id}`} 
+                          fill={entry.type === 'ideal' ? 'transparent' : entry.color} 
+                          stroke={entry.type === 'ideal' ? entry.color : '#ffffff'} 
+                          strokeWidth={4} 
+                          strokeDasharray={entry.type === 'ideal' ? '8 4' : '0'} 
+                        />
+                      ))}
+                    </Scatter>
+                    <Legend content={() => (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+                        {calculateScatterData().map((entry) => (
+                          <Chip
+                            key={entry.id}
+                            label={entry.name}
+                            size="small"
+                            sx={{
+                              bgcolor: `${entry.color}20`,
+                              borderColor: entry.color,
+                              borderWidth: 2,
+                              borderStyle: 'solid',
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    )} />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* チームメモ */}
+        <Card 
+          elevation={0}
+          sx={{ 
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 3,
+          }}
+        >
+          <CardContent>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              📝 チーム全体のメモ
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={6}
+              placeholder="例：今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
+              value={teamMemo}
+              onChange={(e) => setTeamMemo(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                }
+              }}
+            />
+          </CardContent>
+        </Card>
+      </Stack>
+    </Grid>
+
+    {/* 右側: メンバーリストエリア */}
+    <Grid item xs={12} lg={5}>
+      <Stack spacing={2}>
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 2, 
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              メンバー管理
+            </Typography>
+            <Chip 
+              label={`${employees.length}人`} 
+              color="primary" 
+              size="small"
+              sx={{ fontWeight: 600 }}
+            />
+          </Stack>
+
+          <LinearProgress 
+            variant="determinate" 
+            value={(selectedEmployees.length / employees.length) * 100} 
+            sx={{ 
+              height: 8, 
+              borderRadius: 1,
+              mb: 2,
+              bgcolor: 'action.hover',
+            }}
+          />
+
+          {/* 能力評価基準 */}
+          <Accordion 
+            expanded={showCriteria}
+            onChange={() => setShowCriteria(!showCriteria)}
+            sx={{
+              boxShadow: 'none',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: '12px !important',
+              '&:before': { display: 'none' },
+              mb: 2,
+            }}
+          >
+            <AccordionSummary 
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ 
+                borderRadius: 3,
+                '& .MuiAccordionSummary-content': { my: 1.5 }
+              }}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                📋 能力評価基準
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0 }}>
+              <Grid container spacing={2}>
+                {Object.entries(competencyCriteria).map(([key, competency]) => (
+                  <Grid item xs={12} key={key}>
+                    <Accordion
+                      sx={{
+                        boxShadow: 'none',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: '8px !important',
+                        '&:before': { display: 'none' },
+                      }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {competency.name}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Stack spacing={1}>
+                          {Object.entries(competency.levels).map(([level, description]) => (
+                            <Box key={level} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                              <Chip 
+                                label={`Lv.${level}`} 
+                                size="small" 
+                                color="primary"
+                                sx={{ minWidth: 50, fontWeight: 600 }}
+                              />
+                              <Typography variant="caption" sx={{ pt: 0.5, lineHeight: 1.6 }}>
+                                {description}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Stack>
+                      </AccordionDetails>
+                    </Accordion>
+                  </Grid>
+                ))}
               </Grid>
-            </Grid>
-          )}
+            </AccordionDetails>
+          </Accordion>
+        </Paper>
+
+        {/* 理想形カード */}
+        {showIdeal && (
+          <Card 
+            elevation={0}
+            sx={{ 
+              border: '2px dashed',
+              borderColor: 'divider',
+              borderRadius: 3,
+              bgcolor: 'grey.50'
+            }}
+          >
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <IconButton
+                  size="small"
+                  onClick={() => setIdealProfile(prev => ({ ...prev, isExpanded: !prev.isExpanded }))}
+                >
+                  {idealProfile.isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'grey.400', flexShrink: 0 }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>理想形</Typography>
+                <Chip label={calculateAverage(idealProfile)} size="small" color="default" sx={{ ml: 'auto', fontWeight: 700 }} />
+              </Box>
+
+              <Collapse in={idealProfile.isExpanded}>
+                <Grid container spacing={1.5}>
+                  {Object.entries(competencyNames).map(([key, name]) => (
+                    <Grid item xs={6} key={key}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel sx={{ fontSize: '0.875rem' }}>{name}</InputLabel>
+                        <Select
+                          value={idealProfile[key]}
+                          label={name}
+                          onChange={(e) => handleIdealChange(key, e.target.value)}
+                          sx={{ borderRadius: 2 }}
+                        >
+                          {[1, 2, 3, 4, 5].map(level => (
+                            <MenuItem key={level} value={level}>
+                              Lv.{level}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Collapse>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* メンバーカードリスト */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={employees.map(emp => emp.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {employees.map(emp => (
+              <SortableEmployeeCard
+                key={emp.id}
+                emp={emp}
+                competencyNames={competencyNames}
+                selectedEmployees={selectedEmployees}
+                toggleEmployee={toggleEmployee}
+                removeEmployee={removeEmployee}
+                handleScoreChange={handleScoreChange}
+                handleEmployeeMemoChange={handleEmployeeMemoChange}
+                calculateAverage={calculateAverage}
+                getStrengthsAndWeaknesses={getStrengthsAndWeaknesses}
+                setEmployees={setEmployees}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+      </Stack>
+    </Grid>
+  </Grid>
+)}
 
           {/* 成長履歴ビュー */}
           {viewMode === 'history' && (
