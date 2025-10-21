@@ -1,5 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    important: '#root', // MUIのスタイルと競合しないように
+    // ... 既存の設定
+  }
+module.exports = {
     content: [
       "./src/**/*.{js,jsx,ts,tsx}",
     ],
