@@ -54,6 +54,12 @@ import {
   ButtonGroup,
   ToggleButton,
   ToggleButtonGroup,
+  AppBar,
+  Toolbar,
+  InputBase,
+  Avatar,
+  useMediaQuery,
+  useTheme as useMuiTheme,
 } from '@mui/material';
 
 // MUI Icons
@@ -85,6 +91,11 @@ import {
   VisibilityOff as VisibilityOffIcon,
   ShowChart as ShowChartIcon,
   GridOn as GridOnIcon,
+  Search as SearchIcon,
+  Notifications as NotificationsIcon,
+  AccountCircle as AccountCircleIcon,
+  Home as HomeIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 
 import { theme } from './theme';
@@ -94,6 +105,9 @@ const supabase = createClient(
   process.env.REACT_APP_SUPABASE_URL,
   process.env.REACT_APP_SUPABASE_ANON_KEY
 );
+
+// サイドバーの幅
+const DRAWER_WIDTH = 280;
 
 // トースト通知コンポーネント（MUI版）
 function ToastNotification({ open, message, severity, onClose }) {
@@ -178,59 +192,6 @@ function KeyboardShortcutsModal({ isOpen, onClose }) {
         </Alert>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// モバイルメニュー（MUI版）
-function MobileMenu({ viewMode, setViewMode, isOpen, onClose }) {
-  const menuItems = [
-    { id: 'current', icon: <CalendarIcon />, label: '現在の評価' },
-    { id: 'history', icon: <HistoryIcon />, label: '成長履歴' },
-    { id: 'compare', icon: <CompareIcon />, label: '履歴比較' },
-    { id: 'comparison', icon: <TrendingUpIcon />, label: '時系列比較' },
-    { id: 'dashboard', icon: <DashboardIcon />, label: 'チーム分析' }
-  ];
-
-  return (
-    <Drawer
-      anchor="right"
-      open={isOpen}
-      onClose={onClose}
-      PaperProps={{
-        sx: { width: 280, pt: 2 }
-      }}
-    >
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 2, mb: 2 }}>
-        <IconButton onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-      <List>
-        {menuItems.map(item => (
-          <ListItemButton
-            key={item.id}
-            selected={viewMode === item.id}
-            onClick={() => {
-              setViewMode(item.id);
-              onClose();
-            }}
-            sx={{
-              mx: 1,
-              borderRadius: 2,
-              mb: 0.5,
-            }}
-          >
-            <ListItemIcon sx={{ color: viewMode === item.id ? 'primary.main' : 'inherit' }}>
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText 
-              primary={item.label}
-              primaryTypographyProps={{ fontWeight: viewMode === item.id ? 600 : 400 }}
-            />
-          </ListItemButton>
-        ))}
-      </List>
-    </Drawer>
   );
 }
 
@@ -408,9 +369,449 @@ function SortableEmployeeCard({
   );
 }
 
+// ActionBar コンポーネント
+function ActionBar({
+  isSaving,
+  isOnline,
+  hasUnsavedChanges,
+  lastSaved,
+  onSave,
+  onExportSVG,
+  onExportJSON,
+  onImport,
+  onShowKeyboardHelp,
+  onAddMember,
+  showIdeal,
+  onToggleIdeal,
+  chartType,
+  onChartTypeChange,
+}) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        mb: 3,
+        p: 2,
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
+      <Stack spacing={2}>
+        {/* 上段: タイトルとステータス */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
+              PS能力評価チャート
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              10の能力を5段階で評価し、視覚的に強み・弱みを把握する
+            </Typography>
+          </Box>
+
+          {/* ステータス */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            {lastSaved && (
+              <Typography variant="caption" color="text.secondary">
+                {lastSaved.toLocaleTimeString('ja-JP')}
+              </Typography>
+            )}
+            <Chip
+              icon={isOnline ? <WifiIcon /> : <WifiOffIcon />}
+              label={
+                hasUnsavedChanges ? '未保存' : isOnline ? 'オンライン' : 'オフライン'
+              }
+              color={
+                isOnline && !hasUnsavedChanges
+                  ? 'success'
+                  : hasUnsavedChanges
+                  ? 'warning'
+                  : 'error'
+              }
+              size="small"
+              variant="outlined"
+            />
+          </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* 下段: アクション */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 2,
+          }}
+        >
+          {/* 左側: 主要アクション */}
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }} useFlexGap>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={onAddMember}
+              sx={{ borderRadius: 2 }}
+            >
+              メンバー追加
+            </Button>
+
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<SaveIcon />}
+              onClick={onSave}
+              disabled={isSaving}
+              sx={{ borderRadius: 2 }}
+            >
+              {isSaving ? '保存中...' : '保存'}
+            </Button>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={onExportJSON}
+              sx={{ borderRadius: 2 }}
+            >
+              JSON
+            </Button>
+
+            <Button
+              variant="outlined"
+              startIcon={<ImageIcon />}
+              onClick={onExportSVG}
+              sx={{ borderRadius: 2 }}
+            >
+              SVG
+            </Button>
+
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<UploadIcon />}
+              sx={{ borderRadius: 2 }}
+            >
+              インポート
+              <input type="file" accept=".json" onChange={onImport} hidden />
+            </Button>
+          </Stack>
+
+          {/* 右側: ビューコントロール */}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }} useFlexGap>
+            <MuiTooltip title="キーボードショートカット">
+              <IconButton size="small" onClick={onShowKeyboardHelp}>
+                <KeyboardIcon />
+              </IconButton>
+            </MuiTooltip>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5, display: { xs: 'none', sm: 'block' } }} />
+
+            <Chip
+              label="理想形"
+              onClick={onToggleIdeal}
+              color={showIdeal ? 'primary' : 'default'}
+              variant={showIdeal ? 'filled' : 'outlined'}
+              size="small"
+              sx={{ cursor: 'pointer' }}
+            />
+
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 0.5,
+                p: 0.5,
+                bgcolor: 'action.hover',
+                borderRadius: 2,
+              }}
+            >
+              <Button
+                size="small"
+                variant={chartType === 'radar' ? 'contained' : 'text'}
+                onClick={() => onChartTypeChange('radar')}
+                sx={{
+                  minWidth: 80,
+                  borderRadius: 1.5,
+                  py: 0.5,
+                }}
+              >
+                レーダー
+              </Button>
+              <Button
+                size="small"
+                variant={chartType === 'scatter' ? 'contained' : 'text'}
+                onClick={() => onChartTypeChange('scatter')}
+                sx={{
+                  minWidth: 80,
+                  borderRadius: 1.5,
+                  py: 0.5,
+                }}
+              >
+                マトリクス
+              </Button>
+            </Box>
+          </Stack>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+}
+
+// MainLayout コンポーネント
+function MainLayout({ children, viewMode, setViewMode }) {
+  const muiTheme = useMuiTheme();
+  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  // ナビゲーションメニューアイテム
+  const menuItems = [
+    { id: 'current', icon: <HomeIcon />, label: '現在の評価' },
+    { id: 'history', icon: <HistoryIcon />, label: '成長履歴' },
+    { id: 'compare', icon: <CompareIcon />, label: '履歴比較' },
+    { id: 'comparison', icon: <TrendingUpIcon />, label: '時系列比較' },
+    { id: 'dashboard', icon: <DashboardIcon />, label: 'チーム分析' },
+  ];
+
+  // サイドバーコンテンツ
+  const drawer = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* ロゴ・タイトル */}
+      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+          PS
+        </Avatar>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+            PS能力評価
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            v1.0.0
+          </Typography>
+        </Box>
+      </Box>
+
+      <Divider />
+
+      {/* ナビゲーションメニュー */}
+      <List sx={{ flex: 1, px: 2, py: 1 }}>
+        {menuItems.map((item) => (
+          <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+            <ListItemButton
+              selected={viewMode === item.id}
+              onClick={() => {
+                setViewMode(item.id);
+                if (isMobile) setMobileOpen(false);
+              }}
+              sx={{
+                borderRadius: 2,
+                '&.Mui-selected': {
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                  },
+                  '& .MuiListItemIcon-root': {
+                    color: 'primary.contrastText',
+                  },
+                },
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  color: viewMode === item.id ? 'inherit' : 'text.secondary',
+                  minWidth: 40,
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: viewMode === item.id ? 600 : 400,
+                }}
+              />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+
+      <Divider />
+
+      {/* 設定ボタン */}
+      <List sx={{ px: 2, py: 1 }}>
+        <ListItem disablePadding>
+          <ListItemButton sx={{ borderRadius: 2 }}>
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary="設定"
+              primaryTypographyProps={{ fontSize: '0.875rem' }}
+            />
+          </ListItemButton>
+        </ListItem>
+      </List>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {/* トップバー */}
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          ml: { md: `${DRAWER_WIDTH}px` },
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+        }}
+      >
+        <Toolbar>
+          {/* モバイルメニューボタン */}
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { md: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+
+          {/* 検索バー */}
+          <Box
+            sx={{
+              position: 'relative',
+              borderRadius: 2,
+              bgcolor: 'action.hover',
+              '&:hover': {
+                bgcolor: 'action.selected',
+              },
+              mr: 2,
+              width: { xs: '100%', sm: 'auto' },
+              flex: { sm: 1 },
+              maxWidth: 600,
+            }}
+          >
+            <Box
+              sx={{
+                padding: muiTheme.spacing(0, 2),
+                height: '100%',
+                position: 'absolute',
+                pointerEvents: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <SearchIcon />
+            </Box>
+            <InputBase
+              placeholder="検索..."
+              sx={{
+                color: 'inherit',
+                width: '100%',
+                '& .MuiInputBase-input': {
+                  padding: muiTheme.spacing(1.5, 1.5, 1.5, 0),
+                  paddingLeft: `calc(1em + ${muiTheme.spacing(4)})`,
+                  fontSize: '0.875rem',
+                },
+              }}
+            />
+          </Box>
+
+          {/* 右側のアイコン */}
+          <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+            <IconButton color="inherit">
+              <Badge badgeContent={3} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+            <IconButton color="inherit">
+              <AccountCircleIcon />
+            </IconButton>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      {/* サイドナビゲーション */}
+      <Box
+        component="nav"
+        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
+      >
+        {/* モバイル用ドロワー */}
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true,
+          }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: DRAWER_WIDTH,
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+
+        {/* デスクトップ用固定ドロワー */}
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: DRAWER_WIDTH,
+            },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+
+      {/* メインコンテンツ */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          bgcolor: 'background.default',
+          minHeight: '100vh',
+        }}
+      >
+        <Toolbar />
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
 // メインアプリケーション
 function App() {
-  // State管理（既存のstateをそのまま使用）
+  // State管理
   const [employees, setEmployees] = useState([
     { id: 1, name: 'メンバーA', color: '#3b82f6', scores: { dataAnalysis: 3, problemSolving: 4, techKnowledge: 3, learnSpeed: 4, creativity: 3, planning: 3, communication: 4, support: 3, management: 2, strategy: 3 }, isExpanded: true, memo: '' }
   ]);
@@ -428,7 +829,6 @@ function App() {
   const [expandedCriteria, setExpandedCriteria] = useState({});
   const [toasts, setToasts] = useState([]);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -565,7 +965,7 @@ function App() {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
-  // 既存の関数群（calculateAverage, getStrengthsAndWeaknesses等）
+  // 既存の関数群
   const calculateAverage = (scores) => {
     const values = Object.values(scores).filter(v => typeof v === 'number');
     return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
@@ -913,241 +1313,49 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 4 }}>
-        {/* トースト通知 */}
-        {toasts.map(toast => (
-          <ToastNotification
-            key={toast.id}
-            open={true}
-            message={toast.message}
-            severity={toast.severity}
-            onClose={() => removeToast(toast.id)}
+      
+      {/* トースト通知 */}
+      {toasts.map(toast => (
+        <ToastNotification
+          key={toast.id}
+          open={true}
+          message={toast.message}
+          severity={toast.severity}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
+
+      {/* キーボードショートカットモーダル */}
+      <KeyboardShortcutsModal 
+        isOpen={showKeyboardHelp} 
+        onClose={() => setShowKeyboardHelp(false)} 
+      />
+
+      {/* メインレイアウト */}
+      <MainLayout viewMode={viewMode} setViewMode={setViewMode}>
+        <Container maxWidth="xl" disableGutters>
+          {/* アクションバー */}
+          <ActionBar
+            isSaving={isSaving}
+            isOnline={isOnline}
+            hasUnsavedChanges={hasUnsavedChanges}
+            lastSaved={lastSaved}
+            onSave={() => saveToSupabase(false)}
+            onExportSVG={exportChartAsSVG}
+            onExportJSON={exportData}
+            onImport={importData}
+            onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
+            onAddMember={addEmployee}
+            showIdeal={showIdeal}
+            onToggleIdeal={() => setShowIdeal(!showIdeal)}
+            chartType={chartType}
+            onChartTypeChange={setChartType}
           />
-        ))}
-
-        {/* キーボードショートカットモーダル */}
-        <KeyboardShortcutsModal 
-          isOpen={showKeyboardHelp} 
-          onClose={() => setShowKeyboardHelp(false)} 
-        />
-
-        {/* モバイルメニュー */}
-        <MobileMenu 
-          viewMode={viewMode} 
-          setViewMode={setViewMode} 
-          isOpen={mobileMenuOpen} 
-          onClose={() => setMobileMenuOpen(false)} 
-        />
-
-        <Container maxWidth="xl" sx={{ pt: 3 }}>
-          {/* ヘッダーカード */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h1" sx={{ mb: 1 }}>
-                    PS能力評価チャート
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary">
-                    10の能力を5段階で評価し、視覚的に強み・弱みを把握する
-                  </Typography>
-                </Box>
-
-                <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, flexShrink: 0 }}>
-                  <MuiTooltip title="キーボードショートカット (?)">
-                    <IconButton onClick={() => setShowKeyboardHelp(true)}>
-                      <KeyboardIcon />
-                    </IconButton>
-                  </MuiTooltip>
-
-                  <Chip
-                    icon={isOnline ? <WifiIcon /> : <WifiOffIcon />}
-                    label={hasUnsavedChanges ? '未保存' : 'オンライン'}
-                    color={isOnline ? 'success' : 'error'}
-                    variant="outlined"
-                  />
-
-                  <Button
-                    variant="contained"
-                    color="success"
-                    startIcon={<SaveIcon />}
-                    onClick={() => saveToSupabase(false)}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? '保存中...' : '保存'}
-                  </Button>
-
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    startIcon={<ImageIcon />}
-                    onClick={exportChartAsSVG}
-                  >
-                    SVG
-                  </Button>
-
-                  <Button
-                    variant="contained"
-                    startIcon={<DownloadIcon />}
-                    onClick={exportData}
-                  >
-                    JSON
-                  </Button>
-
-                  <Button
-                    variant="contained"
-                    color="info"
-                    component="label"
-                    startIcon={<UploadIcon />}
-                  >
-                    インポート
-                    <input 
-                      type="file" 
-                      accept=".json" 
-                      onChange={importData} 
-                      hidden 
-                    />
-                  </Button>
-                </Box>
-
-                <IconButton
-                  sx={{ display: { xs: 'flex', md: 'none' } }}
-                  onClick={() => setMobileMenuOpen(true)}
-                >
-                  <MenuIcon />
-                </IconButton>
-              </Box>
-
-              {lastSaved && (
-                <Typography variant="caption" color="text.secondary">
-                  最終保存: {lastSaved.toLocaleString('ja-JP')}
-                  {hasUnsavedChanges && (
-                    <Chip 
-                      label="未保存の変更あり" 
-                      size="small" 
-                      color="warning" 
-                      sx={{ ml: 1 }} 
-                    />
-                  )}
-                </Typography>
-              )}
-
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <strong>💡 ヒント:</strong> <kbd>?</kbd> キーでショートカット一覧を表示
-              </Alert>
-
-              {/* 能力評価基準 */}
-              <Accordion 
-                expanded={showCriteria}
-                onChange={() => setShowCriteria(!showCriteria)}
-                sx={{ mt: 2 }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6">
-                    📋 能力評価基準
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Grid container spacing={2}>
-                    {Object.entries(competencyCriteria).map(([key, competency]) => (
-                      <Grid item xs={12} md={6} key={key}>
-                        <Accordion>
-                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Typography fontWeight={600}>
-                              {competency.name}
-                            </Typography>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Stack spacing={1}>
-                              {Object.entries(competency.levels).map(([level, description]) => (
-                                <Box key={level} sx={{ display: 'flex', gap: 1 }}>
-                                  <Chip 
-                                    label={`Lv.${level}`} 
-                                    size="small" 
-                                    color="primary"
-                                    sx={{ minWidth: 50 }}
-                                  />
-                                  <Typography variant="body2">
-                                    {description}
-                                  </Typography>
-                                </Box>
-                              ))}
-                            </Stack>
-                          </AccordionDetails>
-                        </Accordion>
-                      </Grid>
-                    ))}
-                  </Grid>
-                </AccordionDetails>
-              </Accordion>
-            </CardContent>
-          </Card>
 
           {/* プログレスインジケーター */}
           {isSaving && (
             <LinearProgress sx={{ mb: 2 }} />
           )}
-
-          {/* タブナビゲーション */}
-          <Paper sx={{ mb: 3, display: { xs: 'none', md: 'block' } }}>
-            <Tabs
-              value={viewMode}
-              onChange={(e, newValue) => setViewMode(newValue)}
-              variant="fullWidth"
-            >
-              <Tab 
-                icon={<CalendarIcon />} 
-                label="現在の評価" 
-                value="current"
-                iconPosition="start"
-              />
-              <Tab 
-                icon={<HistoryIcon />} 
-                label="成長履歴" 
-                value="history"
-                iconPosition="start"
-              />
-              <Tab 
-                icon={<CompareIcon />} 
-                label="履歴比較" 
-                value="compare"
-                iconPosition="start"
-              />
-              <Tab 
-                icon={<TrendingUpIcon />} 
-                label="時系列比較" 
-                value="comparison"
-                iconPosition="start"
-              />
-              <Tab 
-                icon={<DashboardIcon />} 
-                label="チーム分析" 
-                value="dashboard"
-                iconPosition="start"
-              />
-            </Tabs>
-          </Paper>
-
-          {/* モバイル用タブインジケーター */}
-          <Stack 
-            direction="row" 
-            spacing={1} 
-            justifyContent="center" 
-            sx={{ display: { xs: 'flex', md: 'none' }, mb: 2 }}
-          >
-            {['current', 'history', 'compare', 'comparison', 'dashboard'].map((mode) => (
-              <Box
-                key={mode}
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  bgcolor: viewMode === mode ? 'primary.main' : 'grey.300',
-                  transition: 'all 0.3s',
-                }}
-              />
-            ))}
-          </Stack>
 
           {/* 現在の評価ビュー */}
           {viewMode === 'current' && (
@@ -1363,41 +1571,49 @@ function App() {
                     sx={{ height: 8, borderRadius: 1 }}
                   />
 
-                  <Stack direction="row" spacing={2} flexWrap="wrap">
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={addEmployee}
-                    >
-                      メンバー追加
-                    </Button>
-
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={showIdeal}
-                          onChange={(e) => setShowIdeal(e.target.checked)}
-                        />
-                      }
-                      label="理想形を表示"
-                    />
-
-                    <ToggleButtonGroup
-                      value={chartType}
-                      exclusive
-                      onChange={(e, newType) => newType && setChartType(newType)}
-                      size="small"
-                    >
-                      <ToggleButton value="radar">
-                        <ShowChartIcon sx={{ mr: 0.5 }} />
-                        レーダー
-                      </ToggleButton>
-                      <ToggleButton value="scatter">
-                        <GridOnIcon sx={{ mr: 0.5 }} />
-                        マトリクス
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Stack>
+                  {/* 能力評価基準 */}
+                  <Accordion 
+                    expanded={showCriteria}
+                    onChange={() => setShowCriteria(!showCriteria)}
+                  >
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">
+                        📋 能力評価基準
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Grid container spacing={2}>
+                        {Object.entries(competencyCriteria).map(([key, competency]) => (
+                          <Grid item xs={12} md={6} key={key}>
+                            <Accordion>
+                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Typography fontWeight={600}>
+                                  {competency.name}
+                                </Typography>
+                              </AccordionSummary>
+                              <AccordionDetails>
+                                <Stack spacing={1}>
+                                  {Object.entries(competency.levels).map(([level, description]) => (
+                                    <Box key={level} sx={{ display: 'flex', gap: 1 }}>
+                                      <Chip 
+                                        label={`Lv.${level}`} 
+                                        size="small" 
+                                        color="primary"
+                                        sx={{ minWidth: 50 }}
+                                      />
+                                      <Typography variant="body2">
+                                        {description}
+                                      </Typography>
+                                    </Box>
+                                  ))}
+                                </Stack>
+                              </AccordionDetails>
+                            </Accordion>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </AccordionDetails>
+                  </Accordion>
                 </Stack>
 
                 {/* 理想形カード */}
@@ -1719,16 +1935,7 @@ function App() {
             </Stack>
           )}
         </Container>
-
-        {/* フローティングアクションボタン（モバイル用） */}
-        <Fab
-          color="primary"
-          sx={{ position: 'fixed', bottom: 16, right: 16, display: { md: 'none' } }}
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <MenuIcon />
-        </Fab>
-      </Box>
+      </MainLayout>
     </ThemeProvider>
   );
 }
