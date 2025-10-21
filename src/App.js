@@ -1418,7 +1418,7 @@ function App() {
                 </Card>
 
                 {/* チャート */}
-                <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 4 }}>
                   <CardContent sx={{ p: 3 }}>
                     <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
                       {chartType === 'radar' ? '📊 能力レーダーチャート' : '📈 能力マトリクス'}
