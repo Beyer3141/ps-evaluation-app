@@ -217,9 +217,9 @@ function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleE
       </div>
 
       <div className="mb-4 flex items-center gap-4">
-      <div className="bg-slate-100 rounded-lg px-4 py-3 shadow-sm">
+        <div className="bg-slate-100 rounded-lg px-4 py-3 shadow-sm">
           <div className="text-xs text-slate-600">平均スコア</div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-4">
+          <div className="text-2xl font-bold text-slate-900">
             {calculateAverage(emp.scores)}
           </div>
         </div>
