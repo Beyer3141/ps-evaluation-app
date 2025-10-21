@@ -1343,9 +1343,9 @@ function App() {
 
           {/* 現在の評価ビュー */}
           {viewMode === 'current' && (
-            <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 140px)' }}>
+            <Box sx={{ display: 'flex', gap: 1.5, height: 'calc(100vh - 140px)' }}>
               {/* 左側: チャートエリア（固定幅） */}
-              <Box sx={{ flex: '0 0 60%', display: 'flex', flexDirection: 'column', gap: 3, overflow: 'auto', pr: 0.5 }}>
+              <Box sx={{ flex: '0 0 60%', display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pr: 0.5 }}>
                 {/* 履歴保存 */}
                 <Card 
                   elevation={0}
@@ -1355,7 +1355,7 @@ function App() {
                     background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
                   }}
                 >
-                  <CardContent sx={{ pt: 1, pb: 6 }}>
+                  <CardContent sx={{ pt: 2, pb: 7 }}>
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
                       <Box 
                         sx={{ 
@@ -1575,7 +1575,7 @@ function App() {
               </Box>
 
               {/* 右側: メンバーカード（スクロール可能） */}
-              <Box sx={{ flex: '0 0 40%', display: 'flex', flexDirection: 'column', gap: 2.5, overflow: 'auto', pl: 0.5 }}>
+              <Box sx={{ flex: '0 0 40%', display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pl: 0.5 }}>
                 {/* ヘッダー */}
                 <Paper 
                   elevation={0}
@@ -1590,7 +1590,7 @@ function App() {
                   }}
                 >
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Stack direction="row" spacing={0.5} alignItems="center">
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
                         メンバー管理
                       </Typography>
