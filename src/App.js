@@ -74,7 +74,7 @@ function KeyboardShortcutsModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-md w-full mx-4 animate-slide-in">
+      <div className="relative bg-white rounded-2xl shadow-elevation-4 p-6 md:p-8 max-w-md w-full mx-4 animate-slide-in border border-slate-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <Keyboard className="w-6 h-6" />
@@ -109,7 +109,7 @@ function MobileMenu({ viewMode, setViewMode, isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-40 lg:hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute top-0 right-0 w-64 h-full bg-white shadow-xl p-4 animate-slide-in-right">
+      <div className="absolute top-0 right-0 w-64 h-full bg-white shadow-elevation-4 p-5 animate-slide-in-right border-l border-slate-200">
         <button onClick={onClose} className="absolute top-4 right-4">
           <X className="w-6 h-6" />
         </button>
@@ -127,10 +127,8 @@ function MobileMenu({ viewMode, setViewMode, isOpen, onClose }) {
                 setViewMode(item.id);
                 onClose();
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                viewMode === item.id
-                  ? 'bg-blue-500 text-white'
-                  : 'hover:bg-slate-100 text-slate-700'
+              className={`w-full flex items-center gap-3 px-5 py-3 rounded-lg transition-smooth ${
+                viewMode === item.id ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-100 text-slate-700'
               }`}
             >
               <item.icon className="w-5 h-5" />
@@ -161,7 +159,7 @@ function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleE
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-white rounded-xl shadow-lg pt-2 pb-1 px-2 md:pt-4 md:px-6">
+    <div ref={setNodeRef} style={style} className="bg-white rounded-2xl shadow-elevation-2 hover:shadow-elevation-3 p-4 md:p-6 mb-4 border border-slate-100 transition-smooth">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
           <div 
@@ -196,7 +194,7 @@ function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleE
                 employee.id === emp.id ? { ...employee, name: newName } : employee
               ));
             }}
-            className="text-lg md:text-xl font-bold text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-blue-500 outline-none transition-colors flex-1 min-w-0"
+            className="text-lg md:text-xl font-bold text-slate-900 bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-blue-600 outline-none transition-smooth flex-1 min-w-0"
           />
         </div>
 
@@ -211,7 +209,7 @@ function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleE
           </button>
           <button
             onClick={() => removeEmployee(emp.id)}
-            className="px-2 md:px-3 py-1 bg-red-500 text-white rounded text-xs md:text-sm font-medium hover:bg-red-600 transition-colors whitespace-nowrap"
+            className="px-3 md:px-4 py-1.5 bg-red-600 text-white rounded-lg text-xs md:text-sm font-semibold hover:bg-red-700 active:scale-95 transition-smooth whitespace-nowrap shadow-sm hover:shadow-md"
           >
             削除
           </button>
@@ -219,9 +217,9 @@ function SortableEmployeeCard({ emp, competencyNames, selectedEmployees, toggleE
       </div>
 
       <div className="mb-4 flex items-center gap-4">
-        <div className="bg-slate-100 rounded-lg px-3 md:px-4 py-2">
+      <div className="bg-slate-100 rounded-lg px-4 py-3 shadow-sm">
           <div className="text-xs text-slate-600">平均スコア</div>
-          <div className="text-xl md:text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">
             {calculateAverage(emp.scores)}
           </div>
         </div>
@@ -931,13 +929,13 @@ function App() {
       <MobileMenu viewMode={viewMode} setViewMode={setViewMode} isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
       <div className="w-full max-w-full md:max-w-[90%] lg:max-w-[80%] mx-auto px-0">
-      <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl md:text-4xl font-bold text-slate-800 mb-2 md:mb-3">
-                PS能力評価チャート
-              </h1>
-              <p className="text-sm md:text-base text-slate-600">
+      <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-elevation-2 p-6 md:p-8 mb-8 border border-slate-100 hover:shadow-elevation-3 transition-smooth">
+  <div className="flex items-start justify-between mb-6">
+    <div className="flex-1 min-w-0">
+      <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 tracking-tight">
+        PS能力評価チャート
+      </h1>
+      <p className="text-base text-slate-600 leading-relaxed">
                 10の能力を5段階で評価し、視覚的に強み・弱みを把握する
               </p>
             </div>
@@ -954,17 +952,17 @@ function App() {
                 <span className="text-xs font-medium">{hasUnsavedChanges ? '未保存' : 'オンライン'}</span>
               </div>
               <button
-                onClick={() => saveToSupabase(false)}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:opacity-50"
+  onClick={() => saveToSupabase(false)}
+  disabled={isSaving}
+  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 active:scale-95 transition-smooth font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 title="保存 (Ctrl+S)"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? '保存中...' : '保存'}
               </button>
               <button
-                onClick={exportChartAsSVG}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
+  onClick={exportChartAsSVG}
+  className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 active:scale-95 transition-smooth font-semibold shadow-md hover:shadow-lg"
                 title="チャートをSVGで保存"
               >
                 <Image className="w-4 h-4" />
@@ -972,13 +970,13 @@ function App() {
               </button>
               <button
                 onClick={exportData}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-smooth font-semibold shadow-md hover:shadow-lg"
                 title="エクスポート (Ctrl+E)"
               >
                 <Download className="w-4 h-4" />
                 JSON
               </button>
-              <label className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors font-medium cursor-pointer">
+              <label className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 active:scale-95 transition-smooth font-semibold shadow-md hover:shadow-lg cursor-pointer">
                 <Upload className="w-4 h-4" />
                 インポート
                 <input type="file" accept=".json" onChange={importData} className="hidden" />
@@ -1000,14 +998,14 @@ function App() {
             </div>
           )}
           
-          <div className="bg-blue-50 border-l-4 border-blue-500 p-2 md:p-4 rounded mb-3 md:mb-6">
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-3 md:p-4 rounded-lg mb-6 shadow-sm">
             <p className="text-xs md:text-sm text-slate-700">
               <strong>💡 ヒント:</strong> <kbd className="px-2 py-0.5 bg-white border border-slate-300 rounded text-xs">?</kbd> キーでショートカット一覧を表示
             </p>
           </div>
 
           {/* 能力評価基準（折りたたみ可能） */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg mb-4 md:mb-6 overflow-hidden">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl mb-6 overflow-hidden shadow-sm hover:shadow-md transition-smooth">
             {/* ヘッダー部分（クリックで全体を折りたたみ） */}
             <button
               onClick={() => setShowCriteria(!showCriteria)}
@@ -1081,8 +1079,8 @@ function App() {
               <button
                 key={item.id}
                 onClick={() => setViewMode(item.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  viewMode === item.id ? 'bg-white text-blue-600 shadow' : 'text-slate-600'
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-smooth ${
+                  viewMode === item.id ? 'bg-white text-blue-700 shadow-md' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
                 title={`${item.label} (${item.key})`}
               >
@@ -1105,9 +1103,9 @@ function App() {
           </div>
 
           <div className="flex flex-wrap gap-2 md:gap-3 items-center mb-4 md:mb-6">
-            <button
-              onClick={addEmployee}
-              className="px-3 md:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
+          <button
+  onClick={addEmployee}
+  className="px-4 md:px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-smooth font-semibold text-sm shadow-md hover:shadow-lg"
               title="メンバー追加 (Ctrl+M)"
             >
               + メンバー追加
@@ -1124,14 +1122,14 @@ function App() {
             </label>
 
             <div className="ml-auto flex gap-2 bg-slate-100 p-1 rounded-lg">
-              <button
-                onClick={() => setChartType('radar')}
-                className={`px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
-                  chartType === 'radar' ? 'bg-white text-blue-600 shadow' : 'text-slate-600'
-                }`}
-              >
-                レーダー
-              </button>
+            <button
+  onClick={() => setChartType('radar')}
+  className={`px-4 md:px-6 py-2.5 rounded-lg font-semibold transition-smooth text-sm ${
+    chartType === 'radar' ? 'bg-white text-blue-700 shadow-md' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+  }`}
+>
+  レーダー
+</button>
               <button
                 onClick={() => setChartType('scatter')}
                 className={`px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
@@ -1146,8 +1144,8 @@ function App() {
 
         {viewMode === 'current' && (
           <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 md:gap-8 mb-4 md:mb-8">
-           <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 pb-8 md:pb-24 w-full overflow-hidden" ref={chartRef}>
-           <div className="bg-blue-50 border-l-4 border-blue-500 p-2 md:p-4 rounded mb-3 md:mb-6">
+           <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-elevation-3 p-6 md:p-8 pb-8 md:pb-24 w-full overflow-hidden border border-slate-100 hover:shadow-elevation-4 transition-smooth" ref={chartRef}>
+           <div className="bg-blue-50 border-l-4 border-blue-500 p-3 md:p-4 rounded-lg mb-6 shadow-sm">
                 <p className="text-xs md:text-sm text-slate-700 font-semibold mb-2">
                   💾 評価を履歴として保存
                 </p>
@@ -1158,7 +1156,7 @@ function App() {
                       type="date"
                       value={newEvaluationDate}
                       onChange={(e) => setNewEvaluationDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                      className="w-full px-4 py-2.5 text-sm bg-white border-2 border-slate-200 rounded-lg focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-smooth outline-none"
                     />
                   </div>
                   <div className="flex-1">
@@ -1168,19 +1166,19 @@ function App() {
                       value={newEvaluationMemo}
                       onChange={(e) => setNewEvaluationMemo(e.target.value)}
                       placeholder="例: Q1評価"
-                      className="w-full px-3 py-2 border border-slate-300 rounded text-sm"
+                      className="w-full px-4 py-2.5 text-sm bg-white border-2 border-slate-200 rounded-lg focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-smooth outline-none"
                     />
                   </div>
                   <button
                     onClick={saveAsHistory}
-                    className="sm:self-end px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-medium text-sm whitespace-nowrap"
+                    className="sm:self-end px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-smooth font-semibold text-sm whitespace-nowrap shadow-md hover:shadow-lg"
                   >
                     履歴に保存
                   </button>
                 </div>
               </div>
 
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">
                 {chartType === 'radar' ? '能力レーダーチャート' : '能力マトリクス表'}
               </h2>
               {chartType === 'scatter' && (
@@ -1302,7 +1300,7 @@ onChange={(e) => setTeamMemo(e.target.value)}
 
 placeholder="例：今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
 
-className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none"
+className="w-full px-4 py-3 text-base bg-white border-2 border-slate-200 rounded-lg focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-smooth outline-none resize-none"
 
 rows="25"
 
@@ -1313,7 +1311,7 @@ rows="25"
 
             <div className="space-y-3">
               {showIdeal && (
-                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-lg pt-2 pb-0 px-2 md:pt-3 md:px-6 border-2 border-slate-300">
+                <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl shadow-elevation-2 hover:shadow-elevation-3 p-4 md:p-6 border-2 border-slate-300 transition-smooth">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2 md:gap-3">
                       <button onClick={() => setIdealProfile(prev => ({ ...prev, isExpanded: !prev.isExpanded }))} className="p-1 hover:bg-slate-100 rounded">
@@ -1325,7 +1323,7 @@ rows="25"
                   </div>
 
                   <div className="mb-4">
-                    <div className="bg-white rounded-lg px-3 md:px-4 py-2 inline-block">
+                  <div className="bg-white rounded-lg px-4 py-3 inline-block shadow-sm border border-slate-200">
                       <div className="text-xs text-slate-600">平均スコア</div>
                       <div className="text-xl md:text-2xl font-bold text-slate-800">{calculateAverage(idealProfile)}</div>
                     </div>
@@ -1377,7 +1375,7 @@ rows="25"
 
 {/* 履歴比較ビュー */}
         {viewMode === 'compare' && (
-          <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
+          <div className="card-modern p-6 md:p-8 mb-8 hover-lift animate-fade-in-up">
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-4 flex items-center gap-2">
               <ArrowLeftRight className="w-6 h-6" />
               履歴比較
@@ -1498,8 +1496,8 @@ rows="25"
 
         {/* 時系列比較ビュー */}
         {viewMode === 'comparison' && (
-          <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4">📈 成長トレンド分析</h2>
+          <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-elevation-3 p-6 md:p-8 mb-8 border border-slate-100 hover:shadow-elevation-4 transition-smooth">
+  <h2 className="text-2xl font-bold text-slate-900 mb-6">📈 成長トレンド分析</h2>
             {evaluationHistory.length === 0 ? (
               <div className="text-center py-12 text-slate-500">
                 履歴が2件以上必要です。「現在の評価」タブから履歴を保存してください。
@@ -1569,11 +1567,11 @@ rows="25"
 
         {/* チーム分析ダッシュボード */}
         {viewMode === 'dashboard' && (
-          <div className="bg-white rounded-2xl shadow-xl p-3 md:p-8 mb-3 md:mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4">📊 チーム全体の分析</h2>
+          <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-elevation-3 p-6 md:p-8 mb-8 border border-slate-100 hover:shadow-elevation-4 transition-smooth">
+  <h2 className="text-2xl font-bold text-slate-900 mb-6">📊 チーム全体の分析</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 md:p-6">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 md:p-6 shadow-sm hover:shadow-md transition-smooth border border-blue-100">
                 <div className="text-sm text-blue-600 mb-1">チーム平均スコア</div>
                 <div className="text-2xl md:text-3xl font-bold text-blue-700">
                   {(() => {
@@ -1583,7 +1581,7 @@ rows="25"
                 </div>
               </div>
               
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 md:p-6">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 md:p-6 shadow-sm hover:shadow-md transition-smooth border border-blue-100">
                 <div className="text-sm text-green-600 mb-1">最高スコア保持者</div>
                 <div className="text-xl md:text-2xl font-bold text-green-700">
                   {(() => {
@@ -1595,7 +1593,7 @@ rows="25"
                 </div>
               </div>
               
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 md:p-6">
+              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-5 md:p-6 shadow-sm hover:shadow-md transition-smooth border border-blue-100">
                 <div className="text-sm text-orange-600 mb-1">評価実施回数</div>
                 <div className="text-2xl md:text-3xl font-bold text-orange-700">
                   {evaluationHistory.length + 1}回
@@ -1682,10 +1680,10 @@ rows="25"
         )}
 
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg z-30">
-          <button
-            onClick={() => saveToSupabase(false)}
-            disabled={isSaving}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:opacity-50 text-sm"
+        <button
+  onClick={() => saveToSupabase(false)}
+  disabled={isSaving}
+  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 active:scale-95 transition-smooth font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isSaving ? '保存中...' : hasUnsavedChanges ? '保存する（未保存）' : '保存済み'}
