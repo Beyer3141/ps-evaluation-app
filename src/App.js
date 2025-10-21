@@ -1355,7 +1355,7 @@ function App() {
                     background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
                   }}
                 >
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ pt: 2, pb: 4 }}>
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
                       <Box 
                         sx={{ 
