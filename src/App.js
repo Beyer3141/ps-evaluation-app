@@ -2275,6 +2275,8 @@ function App() {
           competency_names: competencyNames,
           settings,
           updated_at: new Date().toISOString() 
+        },{
+          onConflict: 'organization_id'  // ← これを追加
         });
       
       if (error) throw error;
