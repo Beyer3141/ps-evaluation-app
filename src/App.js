@@ -60,6 +60,9 @@ import {
   Avatar,
   useMediaQuery,
   useTheme as useMuiTheme,
+  CircularProgress,
+  Menu,
+  DialogActions,
 } from '@mui/material';
 
 // MUI Icons
@@ -96,6 +99,9 @@ import {
   AccountCircle as AccountCircleIcon,
   Home as HomeIcon,
   Settings as SettingsIcon,
+  Edit as EditIcon,
+  PhotoCamera as PhotoCameraIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
 
 import { theme } from './theme';
@@ -109,7 +115,101 @@ const supabase = createClient(
 // サイドバーの幅
 const DRAWER_WIDTH = 80;
 
-// トースト通知コンポーネント（MUI版）
+// 認証関連関数
+const signInWithGoogle = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin
+    }
+  });
+  
+  if (error) throw error;
+  return data;
+};
+
+const signOut = async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+};
+
+const getCurrentUser = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+};
+
+// ログイン画面コンポーネント
+function LoginScreen({ onSignIn }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    try {
+      await onSignIn();
+    } catch (error) {
+      console.error('Login error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      }}
+    >
+      <Card sx={{ maxWidth: 400, width: '90%', p: 4 }}>
+        <CardContent>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Avatar
+              sx={{
+                width: 80,
+                height: 80,
+                margin: '0 auto 16px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                fontSize: '2rem',
+                fontWeight: 700,
+              }}
+            >
+              PS
+            </Avatar>
+            <Typography variant="h4" gutterBottom fontWeight={700}>
+              PS能力評価チャート
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              10の能力を5段階で評価し、視覚的に強み・弱みを把握する
+            </Typography>
+          </Box>
+
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            onClick={handleSignIn}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : null}
+            sx={{
+              py: 1.5,
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+              },
+            }}
+          >
+            {loading ? 'ログイン中...' : 'Googleでログイン'}
+          </Button>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}
+
+// トースト通知コンポーネント(MUI版)
 function ToastNotification({ open, message, severity, onClose }) {
   return (
     <Snackbar
@@ -130,7 +230,7 @@ function ToastNotification({ open, message, severity, onClose }) {
   );
 }
 
-// キーボードショートカットヘルプモーダル（MUI版）
+// キーボードショートカットヘルプモーダル(MUI版)
 function KeyboardShortcutsModal({ isOpen, onClose }) {
   const shortcuts = [
     { key: 'Ctrl + S', description: 'データを保存' },
@@ -195,7 +295,221 @@ function KeyboardShortcutsModal({ isOpen, onClose }) {
   );
 }
 
-// ドラッグ可能なメンバーカード（MUI版）
+// 評価基準カスタマイズモーダル
+function CriteriaSettingsModal({ open, onClose, criteria, onSave }) {
+  const [editedCriteria, setEditedCriteria] = useState(criteria);
+
+  useEffect(() => {
+    setEditedCriteria(criteria);
+  }, [criteria]);
+
+  const handleSave = () => {
+    onSave(editedCriteria);
+    onClose();
+  };
+
+  const updateCriteriaLevel = (competencyKey, level, description) => {
+    setEditedCriteria(prev => ({
+      ...prev,
+      [competencyKey]: {
+        ...prev[competencyKey],
+        levels: {
+          ...prev[competencyKey].levels,
+          [level]: description
+        }
+      }
+    }));
+  };
+
+  const updateCriteriaName = (competencyKey, newName) => {
+    setEditedCriteria(prev => ({
+      ...prev,
+      [competencyKey]: {
+        ...prev[competencyKey],
+        name: newName
+      }
+    }));
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">評価基準のカスタマイズ</Typography>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={3}>
+          {Object.entries(editedCriteria).map(([key, competency]) => (
+            <Card key={key} variant="outlined">
+              <CardContent>
+                <TextField
+                  fullWidth
+                  label="能力名"
+                  value={competency.name}
+                  onChange={(e) => updateCriteriaName(key, e.target.value)}
+                  sx={{ mb: 2 }}
+                />
+                <Stack spacing={2}>
+                  {Object.entries(competency.levels).map(([level, description]) => (
+                    <TextField
+                      key={level}
+                      fullWidth
+                      multiline
+                      rows={2}
+                      label={`レベル ${level}`}
+                      value={description}
+                      onChange={(e) => updateCriteriaLevel(key, level, e.target.value)}
+                    />
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose}>キャンセル</Button>
+        <Button variant="contained" onClick={handleSave}>保存</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// 設定モーダル
+function SettingsModal({ open, onClose, settings, onSave }) {
+  const [editedSettings, setEditedSettings] = useState(settings);
+  const [logoPreview, setLogoPreview] = useState(settings.logoUrl);
+
+  useEffect(() => {
+    setEditedSettings(settings);
+    setLogoPreview(settings.logoUrl);
+  }, [settings, open]);
+
+  const handleLogoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // 画像のプレビュー
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result);
+      setEditedSettings(prev => ({ ...prev, logoUrl: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = () => {
+    onSave(editedSettings);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">設定</Typography>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={3}>
+          {/* ロゴ設定 */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              ロゴ画像
+            </Typography>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar
+                src={logoPreview}
+                sx={{
+                  width: 80,
+                  height: 80,
+                  background: logoPreview ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                }}
+              >
+                {!logoPreview && 'PS'}
+              </Avatar>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<PhotoCameraIcon />}
+              >
+                画像を選択
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleLogoChange}
+                />
+              </Button>
+              {logoPreview && editedSettings.logoUrl && (
+                <Button
+                  variant="text"
+                  color="error"
+                  onClick={() => {
+                    setLogoPreview(null);
+                    setEditedSettings(prev => ({ ...prev, logoUrl: null }));
+                  }}
+                >
+                  削除
+                </Button>
+              )}
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          {/* アプリケーション名 */}
+          <TextField
+            fullWidth
+            label="アプリケーション名"
+            value={editedSettings.appName}
+            onChange={(e) => setEditedSettings(prev => ({ ...prev, appName: e.target.value }))}
+          />
+
+          {/* 自動保存設定 */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={editedSettings.autoSave}
+                onChange={(e) => setEditedSettings(prev => ({ ...prev, autoSave: e.target.checked }))}
+              />
+            }
+            label="自動保存を有効にする"
+          />
+
+          {/* 自動保存間隔 */}
+          {editedSettings.autoSave && (
+            <TextField
+              fullWidth
+              type="number"
+              label="自動保存間隔（分）"
+              value={editedSettings.autoSaveInterval}
+              onChange={(e) => setEditedSettings(prev => ({ ...prev, autoSaveInterval: parseInt(e.target.value) }))}
+              InputProps={{
+                inputProps: { min: 1, max: 60 }
+              }}
+            />
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose}>キャンセル</Button>
+        <Button variant="contained" onClick={handleSave}>保存</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ドラッグ可能なメンバーカード(MUI版)
 function SortableEmployeeCard({ 
   emp, 
   competencyNames, 
@@ -554,13 +868,27 @@ function ActionBar({
 }
 
 // MainLayout コンポーネント
-function MainLayout({ children, viewMode, setViewMode }) {
+function MainLayout({ children, viewMode, setViewMode, user, onSignOut, searchQuery, setSearchQuery, settings, onOpenSettings }) {
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [anchorEl, setAnchorEl] = React.useState(null);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleSignOut = () => {
+    handleMenuClose();
+    onSignOut();
   };
 
   // ナビゲーションメニューアイテム
@@ -572,89 +900,91 @@ function MainLayout({ children, viewMode, setViewMode }) {
     { id: 'dashboard', icon: <DashboardIcon />, label: 'チーム分析' },
   ];
 
-// サイドバーコンテンツ
-const drawer = (
-  <Box 
-    sx={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      bgcolor: 'background.paper',
-      borderRight: '1px solid',
-      borderColor: 'divider',
-      py: 2,
-    }}
-  >
-    {/* ロゴ */}
-    <Box sx={{ px: 2, mb: 3, display: 'flex', justifyContent: 'center' }}>
-      <Avatar 
-        sx={{ 
-          width: 48,
-          height: 48,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          fontSize: '1.25rem',
-          fontWeight: 700,
-        }}
-      >
-        PS
-      </Avatar>
-    </Box>
+  // サイドバーコンテンツ
+  const drawer = (
+    <Box 
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        bgcolor: 'background.paper',
+        borderRight: '1px solid',
+        borderColor: 'divider',
+        py: 2,
+      }}
+    >
+      {/* ロゴ */}
+      <Box sx={{ px: 2, mb: 3, display: 'flex', justifyContent: 'center' }}>
+        <Avatar 
+          src={settings.logoUrl}
+          sx={{ 
+            width: 48,
+            height: 48,
+            background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            fontSize: '1.25rem',
+            fontWeight: 700,
+          }}
+        >
+          {!settings.logoUrl && 'PS'}
+        </Avatar>
+      </Box>
 
-    <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ mb: 2 }} />
 
-    {/* ナビゲーションメニュー - アイコンのみ */}
-    <Box sx={{ flex: 1, px: 1.5 }}>
-      {menuItems.map((item) => (
-        <MuiTooltip key={item.id} title={item.label} placement="right" arrow>
+      {/* ナビゲーションメニュー - アイコンのみ */}
+      <Box sx={{ flex: 1, px: 1.5 }}>
+        {menuItems.map((item) => (
+          <MuiTooltip key={item.id} title={item.label} placement="right" arrow>
+            <IconButton
+              onClick={() => {
+                setViewMode(item.id);
+                if (isMobile) setMobileOpen(false);
+              }}
+              sx={{
+                width: '100%',
+                height: 56,
+                borderRadius: 3,
+                mb: 1,
+                color: viewMode === item.id ? 'primary.main' : 'text.secondary',
+                bgcolor: viewMode === item.id ? 'primary.50' : 'transparent',
+                '&:hover': {
+                  bgcolor: viewMode === item.id ? 'primary.100' : 'action.hover',
+                },
+                transition: 'all 0.2s',
+                '& .MuiSvgIcon-root': {
+                  fontSize: '1.75rem',
+                }
+              }}
+            >
+              {item.icon}
+            </IconButton>
+          </MuiTooltip>
+        ))}
+      </Box>
+
+      <Divider sx={{ mb: 2 }} />
+
+      {/* 設定ボタン */}
+      <Box sx={{ px: 1.5 }}>
+        <MuiTooltip title="設定" placement="right" arrow>
           <IconButton
-            onClick={() => {
-              setViewMode(item.id);
-              if (isMobile) setMobileOpen(false);
-            }}
+            onClick={onOpenSettings}
             sx={{
               width: '100%',
               height: 56,
               borderRadius: 3,
-              mb: 1,
-              color: viewMode === item.id ? 'primary.main' : 'text.secondary',
-              bgcolor: viewMode === item.id ? 'primary.50' : 'transparent',
-              '&:hover': {
-                bgcolor: viewMode === item.id ? 'primary.100' : 'action.hover',
-              },
-              transition: 'all 0.2s',
+              color: 'text.secondary',
               '& .MuiSvgIcon-root': {
                 fontSize: '1.75rem',
               }
             }}
           >
-            {item.icon}
+            <SettingsIcon />
           </IconButton>
         </MuiTooltip>
-      ))}
+      </Box>
     </Box>
-
-    <Divider sx={{ mb: 2 }} />
-
-    {/* 設定ボタン */}
-    <Box sx={{ px: 1.5 }}>
-      <MuiTooltip title="設定" placement="right" arrow>
-        <IconButton
-          sx={{
-            width: '100%',
-            height: 56,
-            borderRadius: 3,
-            color: 'text.secondary',
-            '& .MuiSvgIcon-root': {
-              fontSize: '1.75rem',
-            }
-          }}
-        >
-          <SettingsIcon />
-        </IconButton>
-      </MuiTooltip>
-    </Box>
-  </Box>
-);
+  );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -708,7 +1038,9 @@ const drawer = (
               <SearchIcon />
             </Box>
             <InputBase
-              placeholder="検索..."
+              placeholder="メンバー・能力・メモで検索..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               sx={{
                 color: 'inherit',
                 width: '100%',
@@ -728,10 +1060,46 @@ const drawer = (
                 <NotificationsIcon />
               </Badge>
             </IconButton>
-            <IconButton color="inherit">
-              <AccountCircleIcon />
+            <IconButton color="inherit" onClick={handleMenuOpen}>
+              <Avatar 
+                src={user?.user_metadata?.avatar_url}
+                sx={{ width: 32, height: 32 }}
+              >
+                {user?.email?.[0]?.toUpperCase()}
+              </Avatar>
             </IconButton>
           </Box>
+
+          {/* ユーザーメニュー */}
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+          >
+            <Box sx={{ px: 2, py: 1.5, minWidth: 200 }}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                {user?.user_metadata?.full_name || user?.email}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user?.email}
+              </Typography>
+            </Box>
+            <Divider />
+            <MenuItem onClick={handleSignOut}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>ログアウト</ListItemText>
+            </MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
 
@@ -795,6 +1163,10 @@ const drawer = (
 
 // メインアプリケーション
 function App() {
+  // 認証State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // State管理
   const [employees, setEmployees] = useState([
     { id: 1, name: 'メンバーA', color: '#3b82f6', scores: { dataAnalysis: 3, problemSolving: 4, techKnowledge: 3, learnSpeed: 4, creativity: 3, planning: 3, communication: 4, support: 3, management: 2, strategy: 3 }, isExpanded: true, memo: '' }
@@ -817,12 +1189,23 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showCriteriaSettings, setShowCriteriaSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const chartRef = useRef(null);
   const nextId = useRef(2);
 
+  // 設定State
+  const [settings, setSettings] = useState({
+    logoUrl: null,
+    appName: 'PS能力評価チャート',
+    autoSave: true,
+    autoSaveInterval: 1, // 分
+  });
+
   // 能力名の定義
-  const competencyNames = {
+  const [competencyNames, setCompetencyNames] = useState({
     dataAnalysis: 'データ分析力',
     problemSolving: '問題解決力',
     techKnowledge: '技術知識',
@@ -833,10 +1216,10 @@ function App() {
     support: '伴走支援力',
     management: 'マネジメント力',
     strategy: '戦略立案力'
-  };
+  });
 
   // 能力評価基準
-  const competencyCriteria = {
+  const [competencyCriteria, setCompetencyCriteria] = useState({
     dataAnalysis: {
       name: "データ分析力",
       levels: {
@@ -937,7 +1320,7 @@ function App() {
         5: "育成の仕組みを作り、組織能力を向上させられる。"
       }
     }
-  };
+  });
 
   // トースト追加関数
   const addToast = (message, severity = 'info') => {
@@ -947,6 +1330,27 @@ function App() {
 
   const removeToast = (id) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  // 検索フィルター関数
+  const filterEmployeesBySearch = (employees) => {
+    if (!searchQuery.trim()) return employees;
+    
+    const query = searchQuery.toLowerCase();
+    return employees.filter(emp => {
+      // 名前での検索
+      if (emp.name.toLowerCase().includes(query)) return true;
+      
+      // メモでの検索
+      if (emp.memo && emp.memo.toLowerCase().includes(query)) return true;
+      
+      // 能力名での検索
+      const matchesCompetency = Object.entries(competencyNames).some(([key, name]) => 
+        name.toLowerCase().includes(query)
+      );
+      
+      return matchesCompetency;
+    });
   };
 
   // 既存の関数群
@@ -1041,16 +1445,22 @@ function App() {
 
   // Supabase連携
   const saveToSupabase = async (silent = false) => {
+    if (!user) return;
+    
     setIsSaving(true);
     try {
       const { data, error } = await supabase
         .from('evaluations')
         .upsert({ 
-          id: 1, 
+          id: user.id, 
+          user_id: user.id,
           employees, 
           ideal_profile: idealProfile, 
           team_memo: teamMemo, 
           evaluation_history: evaluationHistory,
+          competency_criteria: competencyCriteria,
+          competency_names: competencyNames,
+          settings,
           updated_at: new Date().toISOString() 
         });
       
@@ -1068,20 +1478,25 @@ function App() {
   };
 
   const loadFromSupabase = async () => {
+    if (!user) return;
+    
     try {
       const { data, error } = await supabase
         .from('evaluations')
         .select('*')
-        .eq('id', 1)
+        .eq('user_id', user.id)
         .single();
       
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
         setEmployees(data.employees || []);
         setIdealProfile(data.ideal_profile || idealProfile);
         setTeamMemo(data.team_memo || '');
         setEvaluationHistory(data.evaluation_history || []);
+        if (data.competency_criteria) setCompetencyCriteria(data.competency_criteria);
+        if (data.competency_names) setCompetencyNames(data.competency_names);
+        if (data.settings) setSettings(data.settings);
         setLastSaved(new Date(data.updated_at));
         addToast('データを読み込みました', 'success');
       }
@@ -1092,7 +1507,7 @@ function App() {
 
   // エクスポート・インポート
   const exportData = () => {
-    const dataStr = JSON.stringify({ employees, idealProfile, teamMemo, evaluationHistory }, null, 2);
+    const dataStr = JSON.stringify({ employees, idealProfile, teamMemo, evaluationHistory, competencyCriteria, competencyNames, settings }, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
@@ -1114,6 +1529,9 @@ function App() {
         setIdealProfile(data.idealProfile || idealProfile);
         setTeamMemo(data.teamMemo || '');
         setEvaluationHistory(data.evaluationHistory || []);
+        if (data.competencyCriteria) setCompetencyCriteria(data.competencyCriteria);
+        if (data.competencyNames) setCompetencyNames(data.competencyNames);
+        if (data.settings) setSettings(data.settings);
         addToast('データをインポートしました', 'success');
       } catch (error) {
         addToast('データの読み込みに失敗しました', 'error');
@@ -1202,6 +1620,48 @@ function App() {
     return stats;
   };
 
+  // 設定保存ハンドラー
+  const handleSaveSettings = (newSettings) => {
+    setSettings(newSettings);
+    setHasUnsavedChanges(true);
+    addToast('設定を保存しました', 'success');
+  };
+
+  // 評価基準保存ハンドラー
+  const handleSaveCriteria = (newCriteria) => {
+    setCompetencyCriteria(newCriteria);
+    // 能力名も更新
+    const updatedNames = {};
+    Object.entries(newCriteria).forEach(([key, value]) => {
+      updatedNames[key] = value.name;
+    });
+    setCompetencyNames(updatedNames);
+    setHasUnsavedChanges(true);
+    addToast('評価基準を更新しました', 'success');
+  };
+
+  // 認証処理
+  const handleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+      addToast('ログインしました', 'success');
+    } catch (error) {
+      addToast('ログインに失敗しました', 'error');
+      console.error('Sign in error:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setUser(null);
+      addToast('ログアウトしました', 'info');
+    } catch (error) {
+      addToast('ログアウトに失敗しました', 'error');
+      console.error('Sign out error:', error);
+    }
+  };
+
   // DnD
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1268,21 +1728,38 @@ function App() {
     };
   }, []);
 
+  // 認証状態の確認
+  useEffect(() => {
+    getCurrentUser().then(setUser).finally(() => setAuthLoading(false));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // 初回データ読み込み
   useEffect(() => {
-    loadFromSupabase();
-  }, []);
+    if (user) {
+      loadFromSupabase();
+    }
+  }, [user]);
 
   // 定期保存
   useEffect(() => {
+    if (!settings.autoSave) return;
+    
     const interval = setInterval(() => {
-      if (hasUnsavedChanges && isOnline) {
+      if (hasUnsavedChanges && isOnline && user) {
         saveToSupabase(true);
       }
-    }, 60000);
+    }, settings.autoSaveInterval * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [hasUnsavedChanges, isOnline]);
+  }, [hasUnsavedChanges, isOnline, user, settings.autoSave, settings.autoSaveInterval]);
 
   const teamStats = useMemo(() => calculateTeamStats(), [employees]);
   const topStrengths = useMemo(() => 
@@ -1293,6 +1770,31 @@ function App() {
     Object.entries(teamStats).sort((a, b) => parseFloat(a[1].average) - parseFloat(b[1].average)).slice(0, 3),
     [teamStats]
   );
+
+  // フィルターされたメンバーリスト
+  const filteredEmployees = useMemo(() => filterEmployeesBySearch(employees), [employees, searchQuery]);
+
+  // ローディング中
+  if (authLoading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <CircularProgress />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  // 未ログイン
+  if (!user) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LoginScreen onSignIn={handleSignIn} />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -1315,8 +1817,33 @@ function App() {
         onClose={() => setShowKeyboardHelp(false)} 
       />
 
+      {/* 評価基準カスタマイズモーダル */}
+      <CriteriaSettingsModal
+        open={showCriteriaSettings}
+        onClose={() => setShowCriteriaSettings(false)}
+        criteria={competencyCriteria}
+        onSave={handleSaveCriteria}
+      />
+
+      {/* 設定モーダル */}
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={settings}
+        onSave={handleSaveSettings}
+      />
+
       {/* メインレイアウト */}
-      <MainLayout viewMode={viewMode} setViewMode={setViewMode}>
+      <MainLayout 
+        viewMode={viewMode} 
+        setViewMode={setViewMode}
+        user={user}
+        onSignOut={handleSignOut}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        settings={settings}
+        onOpenSettings={() => setShowSettings(true)}
+      >
         <Container maxWidth="xl" disableGutters>
           {/* アクションバー */}
           <ActionBar
@@ -1343,9 +1870,9 @@ function App() {
 
           {/* 現在の評価ビュー */}
           {viewMode === 'current' && (
-            <Box sx={{ display: 'flex', gap: 1.5, height: 'calc(100vh - 140px)' }}>
-              {/* 左側: チャートエリア（固定幅） */}
-              <Box sx={{ flex: '0 0 60%', display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pr: 0.5 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, minHeight: { md: 'calc(100vh - 140px)' } }}>
+              {/* 左側: チャートエリア */}
+              <Box sx={{ flex: { md: '0 0 60%' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pr: { md: 0.5 } }}>
                 {/* 履歴保存 */}
                 <Card 
                   elevation={0}
@@ -1376,7 +1903,7 @@ function App() {
                       </Typography>
                     </Stack>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="評価日"
@@ -1387,7 +1914,7 @@ function App() {
                           size="small"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
                           fullWidth
                           label="メモ"
@@ -1574,8 +2101,8 @@ function App() {
                 </Card>
               </Box>
 
-              {/* 右側: メンバーカード（スクロール可能） */}
-              <Box sx={{ flex: '0 0 40%', display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pl: 0.5 }}>
+              {/* 右側: メンバーカード(スクロール可能) */}
+              <Box sx={{ flex: { md: '0 0 40%' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pl: { md: 0.5 } }}>
                 {/* ヘッダー */}
                 <Paper 
                   elevation={0}
@@ -1595,7 +2122,7 @@ function App() {
                         メンバー管理
                       </Typography>
                       <Chip 
-                        label={`${employees.length}名`} 
+                        label={`${filteredEmployees.length}名`} 
                         size="small"
                         sx={{ 
                           fontWeight: 700,
@@ -1620,7 +2147,7 @@ function App() {
                   />
                 </Paper>
 
-                {/* 能力評価基準（折りたたみ式） */}
+                {/* 能力評価基準(折りたたみ式) */}
                 <Accordion 
                   expanded={showCriteria}
                   onChange={() => setShowCriteria(!showCriteria)}
@@ -1633,9 +2160,20 @@ function App() {
                   }}
                 >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1" fontWeight={600}>
-                      📋 能力評価基準
-                    </Typography>
+                    <Stack direction="row" alignItems="center" spacing={1} sx={{ width: '100%' }}>
+                      <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
+                        📋 能力評価基準
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowCriteriaSettings(true);
+                        }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Stack spacing={1.5}>
@@ -1734,10 +2272,17 @@ function App() {
                   </Card>
                 )}
 
+                {/* 検索結果の表示 */}
+                {searchQuery && (
+                  <Alert severity="info" sx={{ mb: 1 }}>
+                    「{searchQuery}」で{filteredEmployees.length}件見つかりました
+                  </Alert>
+                )}
+
                 {/* メンバーカード */}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={employees.map(emp => emp.id)} strategy={verticalListSortingStrategy}>
-                    {employees.map(emp => (
+                  <SortableContext items={filteredEmployees.map(emp => emp.id)} strategy={verticalListSortingStrategy}>
+                    {filteredEmployees.map(emp => (
                       <SortableEmployeeCard
                         key={emp.id}
                         emp={emp}
