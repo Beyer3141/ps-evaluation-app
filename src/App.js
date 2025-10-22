@@ -3392,7 +3392,7 @@ useEffect(() => {
         unreadCount={unreadCount}
         onOpenNotifications={() => setShowNotifications(true)}
       >
-        <Container maxWidth="xl" disableGutters>
+        <Box>
           {/* 閲覧専用警告 */}
           {isReadOnly && (
             <Alert severity="info" sx={{ mb: 2 }}>
@@ -4103,7 +4103,7 @@ useEffect(() => {
               </Card>
             </Stack>
           )}
-        </Container>
+        </Box>
       </MainLayout>
     </ThemeProvider>
   );
