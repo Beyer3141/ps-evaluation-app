@@ -300,17 +300,18 @@ const acceptInvitation = async (token, userId) => {
   
   if (invError) {
     console.error('Invitation query error:', invError);
-    throw invError;
+    throw new Error('招待リンクが見つかりません');
   }
   
   if (!invitation) {
-    throw new Error('Invalid or expired invitation');
+    throw new Error('無効な招待リンクです');
   }
   
   if (new Date(invitation.expires_at) < new Date()) {
-    throw new Error('Invitation expired');
+    throw new Error('招待リンクの有効期限が切れています');
   }
   
+  // 既存メンバーかどうかをチェック
   const { data: existingMember } = await supabase
     .from('organization_members')
     .select('id, role')
@@ -321,13 +322,57 @@ const acceptInvitation = async (token, userId) => {
   if (existingMember) {
     console.log('User is already a member of this organization');
     
+    // 招待を既読にする
     await supabase
       .from('invitations')
       .update({ used_at: new Date().toISOString() })
       .eq('id', invitation.id);
     
-    return invitation;
+    // 組織情報を返す（既存メンバーの場合）
+    return { 
+      ...invitation, 
+      isExistingMember: true 
+    };
   }
+  
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  
+  // 新規メンバーとして追加
+  const { error: memberError } = await supabase
+    .from('organization_members')
+    .insert({
+      organization_id: invitation.organization_id,
+      user_id: userId,
+      role: invitation.role,
+      invited_by: invitation.invited_by,
+      joined_at: new Date().toISOString(),
+      user_email: currentUser.email,
+      user_name: currentUser.user_metadata?.full_name || null,
+      user_avatar_url: currentUser.user_metadata?.avatar_url || null
+    });
+  
+  if (memberError) {
+    console.error('Member insertion error:', memberError);
+    throw new Error('メンバーの追加に失敗しました');
+  }
+  
+  // 招待を既読にする
+  const { error: updateError } = await supabase
+    .from('invitations')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', invitation.id);
+  
+  if (updateError) {
+    console.error('Invitation update error:', updateError);
+  }
+  
+  console.log('Invitation accepted successfully');
+  
+  return { 
+    ...invitation, 
+    isExistingMember: false 
+  };
+};
   
   const { data: { user: currentUser } } = await supabase.auth.getUser();
   
@@ -362,7 +407,7 @@ const acceptInvitation = async (token, userId) => {
   console.log('Invitation accepted successfully');
   
   return invitation;
-};
+
 
 const removeMember = async (memberId) => {
   const { error } = await supabase
@@ -1412,6 +1457,7 @@ function SortableEmployeeCard({
 }
 
 // ActionBar コンポーネント
+// ActionBar コンポーネント
 function ActionBar({
   isSaving,
   isOnline,
@@ -1430,7 +1476,15 @@ function ActionBar({
   isReadOnly,
   settings,
   onOpenSettings,
+  // 履歴保存用の新しいprops
+  onSaveHistory,
+  evaluationDate,
+  onEvaluationDateChange,
+  evaluationMemo,
+  onEvaluationMemoChange,
 }) {
+  const [showHistorySave, setShowHistorySave] = React.useState(false);
+
   return (
     <Paper
       elevation={0}
@@ -1564,15 +1618,30 @@ function ActionBar({
             </Button>
 
             {!isReadOnly && (
-              <Button
-                variant="outlined"
-                component="label"
-                startIcon={<UploadIcon />}
-                sx={{ borderRadius: 2 }}
-              >
-                インポート
-                <input type="file" accept=".json" onChange={onImport} hidden />
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<UploadIcon />}
+                  sx={{ borderRadius: 2 }}
+                >
+                  インポート
+                  <input type="file" accept=".json" onChange={onImport} hidden />
+                </Button>
+
+                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+                {/* 履歴保存ボタン */}
+                <Button
+                  variant="outlined"
+                  startIcon={<CalendarIcon />}
+                  onClick={() => setShowHistorySave(!showHistorySave)}
+                  sx={{ borderRadius: 2 }}
+                  color={showHistorySave ? 'primary' : 'inherit'}
+                >
+                  履歴保存
+                </Button>
+              </>
             )}
           </Stack>
 
@@ -1631,6 +1700,49 @@ function ActionBar({
             </Box>
           </Stack>
         </Box>
+
+        {/* 履歴保存フォーム（展開時） */}
+        {!isReadOnly && (
+          <Collapse in={showHistorySave}>
+            <Divider sx={{ my: 1 }} />
+            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <TextField
+                  label="評価日"
+                  type="date"
+                  value={evaluationDate}
+                  onChange={(e) => onEvaluationDateChange(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  sx={{ width: 180 }}
+                />
+                <TextField
+                  label="メモ"
+                  placeholder="Q1評価"
+                  value={evaluationMemo}
+                  onChange={(e) => onEvaluationMemoChange(e.target.value)}
+                  size="small"
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    onSaveHistory();
+                    setShowHistorySave(false);
+                  }}
+                  sx={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+                    }
+                  }}
+                >
+                  履歴に保存
+                </Button>
+              </Stack>
+            </Box>
+          </Collapse>
+        )}
       </Stack>
     </Paper>
   );
@@ -2970,52 +3082,71 @@ function App() {
     }
   };
 
-  // 招待URLの処理
-  useEffect(() => {
-    const path = window.location.pathname;
-    const match = path.match(/\/invite\/(.+)/);
+// 招待URLの処理
+useEffect(() => {
+  const path = window.location.pathname;
+  const match = path.match(/\/invite\/(.+)/);
+  
+  if (match && user) {
+    const token = match[1];
+    console.log('Processing invitation token:', token);
     
-    if (match && user) {
-      const token = match[1];
-      console.log('Processing invitation token:', token);
-      
-      acceptInvitation(token, user.id)
-        .then(async (invitation) => {
-          console.log('Invitation processed:', invitation);
+    acceptInvitation(token, user.id)
+      .then(async (invitation) => {
+        console.log('Invitation processed:', invitation);
+        
+        // 組織リストを再読み込み
+        const orgs = await getUserOrganizations(user.id);
+        console.log('Organizations after join:', orgs);
+        setOrganizations(orgs);
+        
+        // 対象の組織を見つける
+        const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
+        console.log('Target organization:', joinedOrg);
+        
+        if (joinedOrg) {
+          // 組織を切り替え
+          setCurrentOrganization(joinedOrg);
           
-          const orgs = await getUserOrganizations(user.id);
-          console.log('Organizations after join:', orgs);
-          setOrganizations(orgs);
-          
-          const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
-          console.log('Target organization:', joinedOrg);
-          
-          if (joinedOrg) {
-            setCurrentOrganization(joinedOrg);
-            addToast(`${joinedOrg.name}に切り替えました`, 'success');
+          // メッセージを表示
+          if (invitation.isExistingMember) {
+            addToast(`${joinedOrg.name}に切り替えました（既にメンバーです）`, 'info');
           } else {
-            addToast('組織が見つかりませんでした', 'error');
+            addToast(`${joinedOrg.name}に参加しました`, 'success');
           }
           
-          window.history.pushState({}, '', '/');
-        })
-        .catch(error => {
-          console.error('Invitation acceptance failed:', error);
+          // データを読み込み
+          setTimeout(() => {
+            loadFromSupabase();
+            loadOrganizationMembers();
+            loadNotifications();
+          }, 500);
+        } else {
+          console.error('Organization not found in user organizations');
+          addToast('組織への参加に成功しましたが、組織情報の読み込みに失敗しました', 'warning');
           
-          let errorMessage = '招待の承認に失敗しました';
-          if (error.message.includes('duplicate key')) {
-            errorMessage = '既にこの組織のメンバーです';
-          } else if (error.message.includes('expired')) {
-            errorMessage = '招待の有効期限が切れています';
-          } else if (error.message.includes('Invalid')) {
-            errorMessage = '無効な招待リンクです';
-          }
-          
-          addToast(errorMessage, 'error');
-          window.history.pushState({}, '', '/');
-        });
-    }
-  }, [user]);
+          // 組織リストを再度読み込む
+          setTimeout(() => {
+            loadUserOrganizations();
+          }, 1000);
+        }
+        
+        // URLをクリーンアップ
+        window.history.pushState({}, '', '/');
+      })
+      .catch(error => {
+        console.error('Invitation acceptance failed:', error);
+        
+        let errorMessage = '招待の承認に失敗しました';
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        addToast(errorMessage, 'error');
+        window.history.pushState({}, '', '/');
+      });
+  }
+}, [user]);
 
   // キーボードショートカット
   useEffect(() => {
@@ -3296,24 +3427,29 @@ function App() {
 
           {/* アクションバー */}
           <ActionBar
-            isSaving={isSaving}
-            isOnline={isOnline}
-            hasUnsavedChanges={hasUnsavedChanges}
-            lastSaved={lastSaved}
-            onSave={() => saveToSupabase(false)}
-            onExportSVG={exportChartAsSVG}
-            onExportJSON={exportData}
-            onImport={importData}
-            onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
-            onAddMember={addEmployee}
-            showIdeal={showIdeal}
-            onToggleIdeal={() => setShowIdeal(!showIdeal)}
-            chartType={chartType}
-            onChartTypeChange={setChartType}
-            isReadOnly={isReadOnly}
-            settings={settings}
-            onOpenSettings={() => setShowSettings(true)}
-          />
+  isSaving={isSaving}
+  isOnline={isOnline}
+  hasUnsavedChanges={hasUnsavedChanges}
+  lastSaved={lastSaved}
+  onSave={() => saveToSupabase(false)}
+  onExportSVG={exportChartAsSVG}
+  onExportJSON={exportData}
+  onImport={importData}
+  onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
+  onAddMember={addEmployee}
+  showIdeal={showIdeal}
+  onToggleIdeal={() => setShowIdeal(!showIdeal)}
+  chartType={chartType}
+  onChartTypeChange={setChartType}
+  isReadOnly={isReadOnly}
+  settings={settings}
+  onOpenSettings={() => setShowSettings(true)}
+  onSaveHistory={saveAsHistory}
+  evaluationDate={newEvaluationDate}
+  onEvaluationDateChange={setNewEvaluationDate}
+  evaluationMemo={newEvaluationMemo}
+  onEvaluationMemoChange={setNewEvaluationMemo}
+/>
 
           {/* プログレスインジケーター */}
           {isSaving && (
@@ -3325,78 +3461,8 @@ function App() {
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5, minHeight: { md: 'calc(100vh - 140px)' } }}>
               {/* 左側: チャートエリア */}
               <Box sx={{ flex: { md: '0 0 60%' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pr: { md: 0.5 } }}>
-                {/* 履歴保存 */}
-                {!isReadOnly && (
-                  <Card 
-                    elevation={0}
-                    sx={{ 
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
-                    }}
-                  >
-                    <CardContent sx={{ pt: 2, pb: 2 }}>
-                      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
-                        <Box 
-                          sx={{ 
-                            width: 40, 
-                            height: 40, 
-                            borderRadius: 2, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            color: 'white',
-                          }}
-                        >
-                          <CalendarIcon />
-                        </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          評価を履歴として保存
-                        </Typography>
-                      </Stack>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="評価日"
-                            type="date"
-                            value={newEvaluationDate}
-                            onChange={(e) => setNewEvaluationDate(e.target.value)}
-                            InputLabelProps={{ shrink: true }}
-                            size="small"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            label="メモ"
-                            placeholder="Q1評価"
-                            value={newEvaluationMemo}
-                            onChange={(e) => setNewEvaluationMemo(e.target.value)}
-                            size="small"
-                          />
-                        </Grid>
-                        <Grid item xs={12}>
-                          <Button
-                            variant="contained"
-                            onClick={saveAsHistory}
-                            fullWidth
-                            size="large"
-                            sx={{
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              '&:hover': {
-                                background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
-                              }
-                            }}
-                          >
-                            履歴に保存
-                          </Button>
-                        </Grid>
-                      </Grid>
-                    </CardContent>
-                  </Card>
-                )}
+
+
 
                 {/* チャート */}
                 <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 4 }}>
