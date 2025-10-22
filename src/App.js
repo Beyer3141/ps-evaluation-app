@@ -63,6 +63,13 @@ import {
   CircularProgress,
   Menu,
   DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  AvatarGroup,
 } from '@mui/material';
 
 // MUI Icons
@@ -102,6 +109,14 @@ import {
   Edit as EditIcon,
   PhotoCamera as PhotoCameraIcon,
   Logout as LogoutIcon,
+  Group as GroupIcon,
+  PersonAdd as PersonAddIcon,
+  Email as EmailIcon,
+  ContentCopy as ContentCopyIcon,
+  Business as BusinessIcon,
+  AdminPanelSettings as AdminIcon,
+  RemoveRedEye as ViewerIcon,
+  SwapHoriz as SwitchIcon,
 } from '@mui/icons-material';
 
 import { theme } from './theme';
@@ -137,6 +152,515 @@ const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 };
+
+// 組織管理関数
+const createOrganization = async (name, userId) => {
+  const { data: org, error: orgError } = await supabase
+    .from('organizations')
+    .insert({ name, created_by: userId })
+    .select()
+    .single();
+  
+  if (orgError) throw orgError;
+  
+  // オーナーとして自動追加
+  const { error: memberError } = await supabase
+    .from('organization_members')
+    .insert({
+      organization_id: org.id,
+      user_id: userId,
+      role: 'owner',
+      joined_at: new Date().toISOString()
+    });
+  
+  if (memberError) throw memberError;
+  
+  // 初期評価データを作成
+  const { error: evalError } = await supabase
+    .from('evaluations')
+    .insert({
+      organization_id: org.id,
+      employees: [{ id: 1, name: 'メンバーA', color: '#3b82f6', scores: { dataAnalysis: 3, problemSolving: 4, techKnowledge: 3, learnSpeed: 4, creativity: 3, planning: 3, communication: 4, support: 3, management: 2, strategy: 3 }, isExpanded: true, memo: '' }],
+      ideal_profile: { dataAnalysis: 5, problemSolving: 5, techKnowledge: 5, learnSpeed: 5, creativity: 5, planning: 5, communication: 5, support: 5, management: 5, strategy: 5, isExpanded: false },
+      team_memo: '',
+      evaluation_history: [],
+      competency_criteria: null,
+      competency_names: null,
+      settings: { logoUrl: null, appName: 'PS能力評価チャート', autoSave: true, autoSaveInterval: 1 }
+    });
+  
+  if (evalError) throw evalError;
+  
+  return org;
+};
+
+const getUserOrganizations = async (userId) => {
+  const { data, error } = await supabase
+    .from('organization_members')
+    .select(`
+      organization_id,
+      role,
+      organizations (
+        id,
+        name,
+        created_at
+      )
+    `)
+    .eq('user_id', userId);
+  
+  if (error) throw error;
+  return data.map(d => ({ ...d.organizations, role: d.role }));
+};
+
+const getOrganizationMembers = async (orgId) => {
+  const { data, error } = await supabase
+    .from('organization_members')
+    .select(`
+      id,
+      user_id,
+      role,
+      joined_at
+    `)
+    .eq('organization_id', orgId);
+  
+  if (error) throw error;
+  
+  // ユーザー情報を取得
+  const userIds = data.map(m => m.user_id);
+  const users = {};
+  
+  for (const uid of userIds) {
+    const { data: userData } = await supabase.auth.admin.getUserById(uid);
+    if (userData) {
+      users[uid] = userData.user;
+    }
+  }
+  
+  return data.map(member => ({
+    ...member,
+    user: users[member.user_id]
+  }));
+};
+
+const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
+  // トークン生成
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7日間有効
+  
+  const { data, error } = await supabase
+    .from('invitations')
+    .insert({
+      organization_id: orgId,
+      email,
+      role,
+      token,
+      invited_by: invitedBy,
+      expires_at: expiresAt.toISOString()
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+const acceptInvitation = async (token, userId) => {
+  const { data: invitation, error: invError } = await supabase
+    .from('invitations')
+    .select('*')
+    .eq('token', token)
+    .is('used_at', null)
+    .single();
+  
+  if (invError) throw invError;
+  if (!invitation) throw new Error('Invalid or expired invitation');
+  
+  // 有効期限チェック
+  if (new Date(invitation.expires_at) < new Date()) {
+    throw new Error('Invitation expired');
+  }
+  
+  // メンバーとして追加
+  const { error: memberError } = await supabase
+    .from('organization_members')
+    .insert({
+      organization_id: invitation.organization_id,
+      user_id: userId,
+      role: invitation.role,
+      invited_by: invitation.invited_by,
+      joined_at: new Date().toISOString()
+    });
+  
+  if (memberError) throw memberError;
+  
+  // 招待を使用済みに
+  const { error: updateError } = await supabase
+    .from('invitations')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', invitation.id);
+  
+  if (updateError) throw updateError;
+  
+  return invitation;
+};
+
+const removeMember = async (memberId) => {
+  const { error } = await supabase
+    .from('organization_members')
+    .delete()
+    .eq('id', memberId);
+  
+  if (error) throw error;
+};
+
+// 組織選択モーダル
+function OrganizationSelectorModal({ open, onClose, organizations, onSelect, onCreateNew }) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <BusinessIcon color="primary" />
+          <Typography variant="h6">組織を選択</Typography>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          {organizations.map(org => (
+            <Card
+              key={org.id}
+              sx={{
+                cursor: 'pointer',
+                '&:hover': {
+                  boxShadow: 3,
+                  borderColor: 'primary.main',
+                },
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+              onClick={() => onSelect(org)}
+            >
+              <CardContent>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Box>
+                    <Typography variant="h6">{org.name}</Typography>
+                    <Chip
+                      label={org.role === 'owner' ? 'オーナー' : org.role === 'admin' ? '管理者' : org.role === 'member' ? 'メンバー' : '閲覧者'}
+                      size="small"
+                      color={org.role === 'owner' ? 'primary' : org.role === 'admin' ? 'secondary' : 'default'}
+                      sx={{ mt: 1 }}
+                    />
+                  </Box>
+                  <CheckIcon color="action" />
+                </Stack>
+              </CardContent>
+            </Card>
+          ))}
+          
+          {organizations.length === 0 && (
+            <Alert severity="info">
+              まだ組織に参加していません。新しい組織を作成してください。
+            </Alert>
+          )}
+          
+          <Divider sx={{ my: 2 }}>または</Divider>
+          
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={onCreateNew}
+            fullWidth
+            size="large"
+          >
+            新しい組織を作成
+          </Button>
+        </Stack>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// 組織作成モーダル
+function CreateOrganizationModal({ open, onClose, onCreate }) {
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    
+    setLoading(true);
+    try {
+      await onCreate(name);
+      setName('');
+      onClose();
+    } catch (error) {
+      console.error('Organization creation error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>新しい組織を作成</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          fullWidth
+          label="組織名"
+          placeholder="例: 株式会社サンプル"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          sx={{ mt: 2 }}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') handleCreate();
+          }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>キャンセル</Button>
+        <Button
+          variant="contained"
+          onClick={handleCreate}
+          disabled={!name.trim() || loading}
+        >
+          {loading ? '作成中...' : '作成'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// チームメンバー管理モーダル
+function TeamMembersModal({ open, onClose, organization, members, onInvite, onRemove, currentUserId }) {
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('member');
+  const [loading, setLoading] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [showInviteLink, setShowInviteLink] = useState(false);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    
+    setLoading(true);
+    try {
+      const invitation = await onInvite(inviteEmail, inviteRole);
+      const link = `${window.location.origin}/invite/${invitation.token}`;
+      setInviteLink(link);
+      setShowInviteLink(true);
+      setInviteEmail('');
+    } catch (error) {
+      console.error('Invitation error:', error);
+      alert('招待に失敗しました: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyInviteLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    alert('リンクをコピーしました！');
+  };
+
+  const currentUserRole = members.find(m => m.user_id === currentUserId)?.role;
+  const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <GroupIcon color="primary" />
+            <Typography variant="h6">{organization?.name} - メンバー管理</Typography>
+          </Stack>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={3}>
+          {/* メンバー招待セクション */}
+          {canManageMembers && (
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  メンバーを招待
+                </Typography>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="メールアドレス"
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      size="small"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>権限</InputLabel>
+                      <Select
+                        value={inviteRole}
+                        label="権限"
+                        onChange={(e) => setInviteRole(e.target.value)}
+                      >
+                        <MenuItem value="admin">管理者</MenuItem>
+                        <MenuItem value="member">メンバー</MenuItem>
+                        <MenuItem value="viewer">閲覧者</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} sm={3}>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={<PersonAddIcon />}
+                      onClick={handleInvite}
+                      disabled={loading || !inviteEmail.trim()}
+                    >
+                      招待
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                {showInviteLink && (
+                  <Alert
+                    severity="success"
+                    sx={{ mt: 2 }}
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        startIcon={<ContentCopyIcon />}
+                        onClick={copyInviteLink}
+                      >
+                        コピー
+                      </Button>
+                    }
+                  >
+                    招待リンクを生成しました。このリンクをメンバーに送信してください。
+                    <Box sx={{ mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1, wordBreak: 'break-all', fontSize: '0.875rem' }}>
+                      {inviteLink}
+                    </Box>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 権限説明 */}
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                権限について
+              </Typography>
+              <Stack spacing={1}>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Chip label="オーナー" size="small" color="primary" />
+                  <Typography variant="caption">全ての操作が可能。組織の削除も可能。</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Chip label="管理者" size="small" color="secondary" />
+                  <Typography variant="caption">メンバー管理・データ編集が可能。</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Chip label="メンバー" size="small" />
+                  <Typography variant="caption">データの閲覧・編集が可能。</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                  <Chip label="閲覧者" size="small" />
+                  <Typography variant="caption">データの閲覧のみ可能。</Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* メンバーリスト */}
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>メンバー</TableCell>
+                  <TableCell>権限</TableCell>
+                  <TableCell>参加日</TableCell>
+                  <TableCell align="right">アクション</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {members.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Avatar
+                          src={member.user?.user_metadata?.avatar_url}
+                          sx={{ width: 32, height: 32 }}
+                        >
+                          {member.user?.email?.[0]?.toUpperCase() || '?'}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2">
+                            {member.user?.user_metadata?.full_name || member.user?.email || '不明なユーザー'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {member.user?.email || ''}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={
+                          member.role === 'owner' ? 'オーナー' :
+                          member.role === 'admin' ? '管理者' :
+                          member.role === 'member' ? 'メンバー' : '閲覧者'
+                        }
+                        size="small"
+                        color={
+                          member.role === 'owner' ? 'primary' :
+                          member.role === 'admin' ? 'secondary' : 'default'
+                        }
+                        icon={
+                          member.role === 'owner' ? <AdminIcon /> :
+                          member.role === 'admin' ? <AdminIcon /> :
+                          member.role === 'viewer' ? <ViewerIcon /> : <PersonIcon />
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption">
+                        {new Date(member.joined_at).toLocaleDateString('ja-JP')}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {canManageMembers && member.role !== 'owner' && member.user_id !== currentUserId && (
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            if (window.confirm('本当にこのメンバーを削除しますか？')) {
+                              onRemove(member.id);
+                            }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ログイン画面コンポーネント
 function LoginScreen({ onSignIn }) {
@@ -520,7 +1044,8 @@ function SortableEmployeeCard({
   handleEmployeeMemoChange, 
   calculateAverage, 
   getStrengthsAndWeaknesses, 
-  setEmployees 
+  setEmployees,
+  isReadOnly
 }) {
   const {
     attributes,
@@ -557,9 +1082,11 @@ function SortableEmployeeCard({
       <CardContent sx={{ p: 2.5 }}>
         {/* ヘッダー */}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <IconButton {...attributes} {...listeners} size="small" sx={{ cursor: 'grab', color: 'text.secondary' }}>
-            <DragIcon fontSize="small" />
-          </IconButton>
+          {!isReadOnly && (
+            <IconButton {...attributes} {...listeners} size="small" sx={{ cursor: 'grab', color: 'text.secondary' }}>
+              <DragIcon fontSize="small" />
+            </IconButton>
+          )}
           
           <IconButton
             size="small"
@@ -578,11 +1105,14 @@ function SortableEmployeeCard({
           <TextField
             value={emp.name}
             onChange={(e) => {
-              setEmployees(prev => prev.map(employee => 
-                employee.id === emp.id ? { ...employee, name: e.target.value } : employee
-              ));
+              if (!isReadOnly) {
+                setEmployees(prev => prev.map(employee => 
+                  employee.id === emp.id ? { ...employee, name: e.target.value } : employee
+                ));
+              }
             }}
             variant="standard"
+            disabled={isReadOnly}
             sx={{
               flex: 1,
               '& .MuiInput-input': {
@@ -611,9 +1141,11 @@ function SortableEmployeeCard({
             {selectedEmployees.includes(emp.id) ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
           </IconButton>
 
-          <IconButton size="small" color="error" onClick={() => removeEmployee(emp.id)}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          {!isReadOnly && (
+            <IconButton size="small" color="error" onClick={() => removeEmployee(emp.id)}>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          )}
         </Stack>
 
         {/* 統計 */}
@@ -638,12 +1170,12 @@ function SortableEmployeeCard({
           <Grid container spacing={1.5}>
             {Object.entries(competencyNames).map(([key, name]) => (
               <Grid item xs={6} key={key}>
-                <FormControl fullWidth size="small">
+                <FormControl fullWidth size="small" disabled={isReadOnly}>
                   <InputLabel sx={{ fontSize: '0.875rem' }}>{name}</InputLabel>
                   <Select
                     value={emp.scores[key]}
                     label={name}
-                    onChange={(e) => handleScoreChange(emp.id, key, e.target.value)}
+                    onChange={(e) => !isReadOnly && handleScoreChange(emp.id, key, e.target.value)}
                   >
                     {[1, 2, 3, 4, 5].map(level => (
                       <MenuItem key={level} value={level}>Lv.{level}</MenuItem>
@@ -660,7 +1192,8 @@ function SortableEmployeeCard({
             rows={3}
             placeholder="メモ..."
             value={emp.memo || ''}
-            onChange={(e) => handleEmployeeMemoChange(emp.id, e.target.value)}
+            onChange={(e) => !isReadOnly && handleEmployeeMemoChange(emp.id, e.target.value)}
+            disabled={isReadOnly}
             sx={{ mt: 2 }}
           />
         </Collapse>
@@ -685,6 +1218,7 @@ function ActionBar({
   onToggleIdeal,
   chartType,
   onChartTypeChange,
+  isReadOnly,
 }) {
   return (
     <Paper
@@ -719,6 +1253,15 @@ function ActionBar({
 
           {/* ステータス */}
           <Stack direction="row" spacing={1} alignItems="center">
+            {isReadOnly && (
+              <Chip
+                icon={<ViewerIcon />}
+                label="閲覧専用"
+                size="small"
+                color="default"
+                variant="outlined"
+              />
+            )}
             {lastSaved && (
               <Typography variant="caption" color="text.secondary">
                 {lastSaved.toLocaleTimeString('ja-JP')}
@@ -756,27 +1299,31 @@ function ActionBar({
         >
           {/* 左側: 主要アクション */}
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }} useFlexGap>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={onAddMember}
-              sx={{ borderRadius: 2 }}
-            >
-              メンバー追加
-            </Button>
+            {!isReadOnly && (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={onAddMember}
+                  sx={{ borderRadius: 2 }}
+                >
+                  メンバー追加
+                </Button>
 
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<SaveIcon />}
-              onClick={onSave}
-              disabled={isSaving}
-              sx={{ borderRadius: 2 }}
-            >
-              {isSaving ? '保存中...' : '保存'}
-            </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<SaveIcon />}
+                  onClick={onSave}
+                  disabled={isSaving}
+                  sx={{ borderRadius: 2 }}
+                >
+                  {isSaving ? '保存中...' : '保存'}
+                </Button>
 
-            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+              </>
+            )}
 
             <Button
               variant="outlined"
@@ -796,15 +1343,17 @@ function ActionBar({
               SVG
             </Button>
 
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<UploadIcon />}
-              sx={{ borderRadius: 2 }}
-            >
-              インポート
-              <input type="file" accept=".json" onChange={onImport} hidden />
-            </Button>
+            {!isReadOnly && (
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<UploadIcon />}
+                sx={{ borderRadius: 2 }}
+              >
+                インポート
+                <input type="file" accept=".json" onChange={onImport} hidden />
+              </Button>
+            )}
           </Stack>
 
           {/* 右側: ビューコントロール */}
@@ -868,7 +1417,21 @@ function ActionBar({
 }
 
 // MainLayout コンポーネント
-function MainLayout({ children, viewMode, setViewMode, user, onSignOut, searchQuery, setSearchQuery, settings, onOpenSettings }) {
+function MainLayout({ 
+  children, 
+  viewMode, 
+  setViewMode, 
+  user, 
+  onSignOut, 
+  searchQuery, 
+  setSearchQuery, 
+  settings, 
+  onOpenSettings,
+  currentOrganization,
+  onOpenTeamMembers,
+  onSwitchOrganization,
+  organizationMembers,
+}) {
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -964,6 +1527,28 @@ function MainLayout({ children, viewMode, setViewMode, user, onSignOut, searchQu
 
       <Divider sx={{ mb: 2 }} />
 
+      {/* チームボタン */}
+      <Box sx={{ px: 1.5, mb: 1 }}>
+        <MuiTooltip title="チーム管理" placement="right" arrow>
+          <IconButton
+            onClick={onOpenTeamMembers}
+            sx={{
+              width: '100%',
+              height: 56,
+              borderRadius: 3,
+              color: 'text.secondary',
+              '& .MuiSvgIcon-root': {
+                fontSize: '1.75rem',
+              }
+            }}
+          >
+            <Badge badgeContent={organizationMembers.length} color="primary">
+              <GroupIcon />
+            </Badge>
+          </IconButton>
+        </MuiTooltip>
+      </Box>
+
       {/* 設定ボタン */}
       <Box sx={{ px: 1.5 }}>
         <MuiTooltip title="設定" placement="right" arrow>
@@ -1008,6 +1593,24 @@ function MainLayout({ children, viewMode, setViewMode, user, onSignOut, searchQu
           >
             <MenuIcon />
           </IconButton>
+
+          {/* 組織情報 */}
+          <Box sx={{ mr: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <BusinessIcon color="action" />
+            <Box>
+              <Typography variant="body2" fontWeight={600}>
+                {currentOrganization?.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {currentOrganization?.role === 'owner' ? 'オーナー' : 
+                 currentOrganization?.role === 'admin' ? '管理者' : 
+                 currentOrganization?.role === 'member' ? 'メンバー' : '閲覧者'}
+              </Typography>
+            </Box>
+            <IconButton size="small" onClick={onSwitchOrganization}>
+              <SwitchIcon fontSize="small" />
+            </IconButton>
+          </Box>
 
           {/* 検索バー */}
           <Box
@@ -1055,6 +1658,23 @@ function MainLayout({ children, viewMode, setViewMode, user, onSignOut, searchQu
 
           {/* 右側のアイコン */}
           <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
+            {/* メンバーアバター */}
+            <MuiTooltip title="チームメンバー">
+              <IconButton onClick={onOpenTeamMembers}>
+                <AvatarGroup max={3} sx={{ '& .MuiAvatar-root': { width: 28, height: 28, fontSize: '0.875rem' } }}>
+                  {organizationMembers.slice(0, 3).map((member, idx) => (
+                    <Avatar
+                      key={idx}
+                      src={member.user?.user_metadata?.avatar_url}
+                      sx={{ width: 28, height: 28 }}
+                    >
+                      {member.user?.email?.[0]?.toUpperCase() || '?'}
+                    </Avatar>
+                  ))}
+                </AvatarGroup>
+              </IconButton>
+            </MuiTooltip>
+
             <IconButton color="inherit">
               <Badge badgeContent={3} color="error">
                 <NotificationsIcon />
@@ -1093,6 +1713,12 @@ function MainLayout({ children, viewMode, setViewMode, user, onSignOut, searchQu
               </Typography>
             </Box>
             <Divider />
+            <MenuItem onClick={onSwitchOrganization}>
+              <ListItemIcon>
+                <SwitchIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>組織を切り替え</ListItemText>
+            </MenuItem>
             <MenuItem onClick={handleSignOut}>
               <ListItemIcon>
                 <LogoutIcon fontSize="small" />
@@ -1166,6 +1792,14 @@ function App() {
   // 認証State
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // 組織State
+  const [organizations, setOrganizations] = useState([]);
+  const [currentOrganization, setCurrentOrganization] = useState(null);
+  const [organizationMembers, setOrganizationMembers] = useState([]);
+  const [showOrgSelector, setShowOrgSelector] = useState(false);
+  const [showCreateOrg, setShowCreateOrg] = useState(false);
+  const [showTeamMembers, setShowTeamMembers] = useState(false);
 
   // State管理
   const [employees, setEmployees] = useState([
@@ -1322,6 +1956,10 @@ function App() {
     }
   });
 
+  // 権限チェック
+  const isReadOnly = currentOrganization?.role === 'viewer';
+  const canManageMembers = currentOrganization?.role === 'owner' || currentOrganization?.role === 'admin';
+
   // トースト追加関数
   const addToast = (message, severity = 'info') => {
     const id = Date.now();
@@ -1353,6 +1991,87 @@ function App() {
     });
   };
 
+  // 組織関連ハンドラー
+  const loadUserOrganizations = async () => {
+    if (!user) return;
+    
+    try {
+      const orgs = await getUserOrganizations(user.id);
+      setOrganizations(orgs);
+      
+      if (orgs.length > 0) {
+        // 最初の組織を選択
+        if (!currentOrganization) {
+          setCurrentOrganization(orgs[0]);
+        }
+      } else {
+        // 組織がない場合は作成を促す
+        setShowCreateOrg(true);
+      }
+    } catch (error) {
+      console.error('Failed to load organizations:', error);
+      addToast('組織の読み込みに失敗しました', 'error');
+    }
+  };
+
+  const handleCreateOrganization = async (name) => {
+    try {
+      const org = await createOrganization(name, user.id);
+      setOrganizations(prev => [...prev, { ...org, role: 'owner' }]);
+      setCurrentOrganization({ ...org, role: 'owner' });
+      addToast('組織を作成しました', 'success');
+      setShowCreateOrg(false);
+    } catch (error) {
+      console.error('Failed to create organization:', error);
+      addToast('組織の作成に失敗しました', 'error');
+    }
+  };
+
+  const handleSelectOrganization = (org) => {
+    setCurrentOrganization(org);
+    setShowOrgSelector(false);
+    addToast(`${org.name}に切り替えました`, 'info');
+  };
+
+  const loadOrganizationMembers = async () => {
+    if (!currentOrganization) return;
+    
+    try {
+      const members = await getOrganizationMembers(currentOrganization.id);
+      setOrganizationMembers(members);
+    } catch (error) {
+      console.error('Failed to load members:', error);
+    }
+  };
+
+  const handleInviteMember = async (email, role) => {
+    try {
+      const invitation = await inviteUserToOrganization(
+        currentOrganization.id,
+        email,
+        role,
+        user.id
+      );
+      addToast('招待リンクを生成しました', 'success');
+      return invitation;
+    } catch (error) {
+      console.error('Failed to invite member:', error);
+      addToast('招待に失敗しました', 'error');
+      throw error;
+    }
+  };
+
+  const handleRemoveMember = async (memberId) => {
+    try {
+      await removeMember(memberId);
+      await loadOrganizationMembers();
+      addToast('メンバーを削除しました', 'info');
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+      addToast('メンバーの削除に失敗しました', 'error');
+    }
+  };
+
   // 既存の関数群
   const calculateAverage = (scores) => {
     const values = Object.values(scores).filter(v => typeof v === 'number');
@@ -1372,6 +2091,11 @@ function App() {
   };
 
   const addEmployee = () => {
+    if (isReadOnly) {
+      addToast('閲覧専用モードでは編集できません', 'warning');
+      return;
+    }
+    
     const newEmployee = {
       id: nextId.current++,
       name: `メンバー${String.fromCharCode(64 + nextId.current)}`,
@@ -1386,6 +2110,11 @@ function App() {
   };
 
   const removeEmployee = (id) => {
+    if (isReadOnly) {
+      addToast('閲覧専用モードでは編集できません', 'warning');
+      return;
+    }
+    
     setEmployees(prev => prev.filter(emp => emp.id !== id));
     setSelectedEmployees(prev => prev.filter(empId => empId !== id));
     addToast('メンバーを削除しました', 'info');
@@ -1398,6 +2127,8 @@ function App() {
   };
 
   const handleScoreChange = (empId, competency, value) => {
+    if (isReadOnly) return;
+    
     setEmployees(prev => prev.map(emp => 
       emp.id === empId ? { ...emp, scores: { ...emp.scores, [competency]: parseInt(value) } } : emp
     ));
@@ -1405,6 +2136,8 @@ function App() {
   };
 
   const handleEmployeeMemoChange = (empId, memo) => {
+    if (isReadOnly) return;
+    
     setEmployees(prev => prev.map(emp => 
       emp.id === empId ? { ...emp, memo } : emp
     ));
@@ -1443,17 +2176,16 @@ function App() {
     return data;
   };
 
-  // Supabase連携
+  // Supabase連携（組織単位）
   const saveToSupabase = async (silent = false) => {
-    if (!user) return;
+    if (!user || !currentOrganization || isReadOnly) return;
     
     setIsSaving(true);
     try {
       const { data, error } = await supabase
         .from('evaluations')
         .upsert({ 
-          id: user.id, 
-          user_id: user.id,
+          organization_id: currentOrganization.id,
           employees, 
           ideal_profile: idealProfile, 
           team_memo: teamMemo, 
@@ -1478,13 +2210,13 @@ function App() {
   };
 
   const loadFromSupabase = async () => {
-    if (!user) return;
+    if (!user || !currentOrganization) return;
     
     try {
       const { data, error } = await supabase
         .from('evaluations')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('organization_id', currentOrganization.id)
         .single();
       
       if (error && error.code !== 'PGRST116') throw error;
@@ -1512,12 +2244,17 @@ function App() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ps-evaluation-${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `ps-evaluation-${currentOrganization?.name || 'data'}-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     addToast('データをエクスポートしました', 'success');
   };
 
   const importData = (e) => {
+    if (isReadOnly) {
+      addToast('閲覧専用モードではインポートできません', 'warning');
+      return;
+    }
+    
     const file = e.target.files[0];
     if (!file) return;
     
@@ -1553,13 +2290,18 @@ function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `chart-${new Date().toISOString().split('T')[0]}.svg`;
+    link.download = `chart-${currentOrganization?.name || 'data'}-${new Date().toISOString().split('T')[0]}.svg`;
     link.click();
     addToast('チャートをSVGで保存しました', 'success');
   };
 
   // 履歴保存
   const saveAsHistory = () => {
+    if (isReadOnly) {
+      addToast('閲覧専用モードでは編集できません', 'warning');
+      return;
+    }
+    
     if (!newEvaluationDate) {
       addToast('評価日を入力してください', 'warning');
       return;
@@ -1629,6 +2371,11 @@ function App() {
 
   // 評価基準保存ハンドラー
   const handleSaveCriteria = (newCriteria) => {
+    if (isReadOnly) {
+      addToast('閲覧専用モードでは編集できません', 'warning');
+      return;
+    }
+    
     setCompetencyCriteria(newCriteria);
     // 能力名も更新
     const updatedNames = {};
@@ -1655,6 +2402,8 @@ function App() {
     try {
       await signOut();
       setUser(null);
+      setCurrentOrganization(null);
+      setOrganizations([]);
       addToast('ログアウトしました', 'info');
     } catch (error) {
       addToast('ログアウトに失敗しました', 'error');
@@ -1670,6 +2419,8 @@ function App() {
   );
 
   const handleDragEnd = (event) => {
+    if (isReadOnly) return;
+    
     const { active, over } = event;
     if (active.id !== over.id) {
       setEmployees((items) => {
@@ -1680,12 +2431,33 @@ function App() {
     }
   };
 
+  // 招待URLの処理
+  useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/\/invite\/(.+)/);
+    
+    if (match && user) {
+      const token = match[1];
+      acceptInvitation(token, user.id)
+        .then(() => {
+          addToast('組織に参加しました', 'success');
+          window.history.pushState({}, '', '/');
+          loadUserOrganizations();
+        })
+        .catch(error => {
+          console.error('Invitation acceptance failed:', error);
+          addToast('招待の承認に失敗しました: ' + error.message, 'error');
+          window.history.pushState({}, '', '/');
+        });
+    }
+  }, [user]);
+
   // キーボードショートカット
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        saveToSupabase(false);
+        if (!isReadOnly) saveToSupabase(false);
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
@@ -1693,7 +2465,7 @@ function App() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
         e.preventDefault();
-        addEmployee();
+        if (!isReadOnly) addEmployee();
       }
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key === '1') setViewMode('current');
@@ -1712,7 +2484,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isReadOnly]);
 
   // オンライン状態監視
   useEffect(() => {
@@ -1741,25 +2513,33 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 初回データ読み込み
+  // ユーザーの組織を読み込み
   useEffect(() => {
     if (user) {
-      loadFromSupabase();
+      loadUserOrganizations();
     }
   }, [user]);
 
+  // 組織が選択されたらデータと メンバーを読み込み
+  useEffect(() => {
+    if (currentOrganization) {
+      loadFromSupabase();
+      loadOrganizationMembers();
+    }
+  }, [currentOrganization]);
+
   // 定期保存
   useEffect(() => {
-    if (!settings.autoSave) return;
+    if (!settings.autoSave || isReadOnly) return;
     
     const interval = setInterval(() => {
-      if (hasUnsavedChanges && isOnline && user) {
+      if (hasUnsavedChanges && isOnline && user && currentOrganization) {
         saveToSupabase(true);
       }
     }, settings.autoSaveInterval * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [hasUnsavedChanges, isOnline, user, settings.autoSave, settings.autoSaveInterval]);
+  }, [hasUnsavedChanges, isOnline, user, currentOrganization, settings.autoSave, settings.autoSaveInterval, isReadOnly]);
 
   const teamStats = useMemo(() => calculateTeamStats(), [employees]);
   const topStrengths = useMemo(() => 
@@ -1792,6 +2572,30 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <LoginScreen onSignIn={handleSignIn} />
+      </ThemeProvider>
+    );
+  }
+
+  // 組織未選択
+  if (!currentOrganization) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <CircularProgress />
+        </Box>
+        <OrganizationSelectorModal
+          open={showOrgSelector || organizations.length === 0}
+          onClose={() => setShowOrgSelector(false)}
+          organizations={organizations}
+          onSelect={handleSelectOrganization}
+          onCreateNew={() => setShowCreateOrg(true)}
+        />
+        <CreateOrganizationModal
+          open={showCreateOrg}
+          onClose={() => setShowCreateOrg(false)}
+          onCreate={handleCreateOrganization}
+        />
       </ThemeProvider>
     );
   }
@@ -1833,6 +2637,36 @@ function App() {
         onSave={handleSaveSettings}
       />
 
+      {/* 組織選択モーダル */}
+      <OrganizationSelectorModal
+        open={showOrgSelector}
+        onClose={() => setShowOrgSelector(false)}
+        organizations={organizations}
+        onSelect={handleSelectOrganization}
+        onCreateNew={() => {
+          setShowOrgSelector(false);
+          setShowCreateOrg(true);
+        }}
+      />
+
+      {/* 組織作成モーダル */}
+      <CreateOrganizationModal
+        open={showCreateOrg}
+        onClose={() => setShowCreateOrg(false)}
+        onCreate={handleCreateOrganization}
+      />
+
+      {/* チームメンバー管理モーダル */}
+      <TeamMembersModal
+        open={showTeamMembers}
+        onClose={() => setShowTeamMembers(false)}
+        organization={currentOrganization}
+        members={organizationMembers}
+        onInvite={handleInviteMember}
+        onRemove={handleRemoveMember}
+        currentUserId={user.id}
+      />
+
       {/* メインレイアウト */}
       <MainLayout 
         viewMode={viewMode} 
@@ -1843,8 +2677,19 @@ function App() {
         setSearchQuery={setSearchQuery}
         settings={settings}
         onOpenSettings={() => setShowSettings(true)}
+        currentOrganization={currentOrganization}
+        onOpenTeamMembers={() => setShowTeamMembers(true)}
+        onSwitchOrganization={() => setShowOrgSelector(true)}
+        organizationMembers={organizationMembers}
       >
         <Container maxWidth="xl" disableGutters>
+          {/* 閲覧専用警告 */}
+          {isReadOnly && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              閲覧専用モードです。データの編集はできません。
+            </Alert>
+          )}
+
           {/* アクションバー */}
           <ActionBar
             isSaving={isSaving}
@@ -1861,6 +2706,7 @@ function App() {
             onToggleIdeal={() => setShowIdeal(!showIdeal)}
             chartType={chartType}
             onChartTypeChange={setChartType}
+            isReadOnly={isReadOnly}
           />
 
           {/* プログレスインジケーター */}
@@ -1874,75 +2720,77 @@ function App() {
               {/* 左側: チャートエリア */}
               <Box sx={{ flex: { md: '0 0 60%' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pr: { md: 0.5 } }}>
                 {/* 履歴保存 */}
-                <Card 
-                  elevation={0}
-                  sx={{ 
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
-                  }}
-                >
-                  <CardContent sx={{ pt: 2, pb: 7 }}>
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
-                      <Box 
-                        sx={{ 
-                          width: 40, 
-                          height: 40, 
-                          borderRadius: 2, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          color: 'white',
-                        }}
-                      >
-                        <CalendarIcon />
-                      </Box>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        評価を履歴として保存
-                      </Typography>
-                    </Stack>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="評価日"
-                          type="date"
-                          value={newEvaluationDate}
-                          onChange={(e) => setNewEvaluationDate(e.target.value)}
-                          InputLabelProps={{ shrink: true }}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <TextField
-                          fullWidth
-                          label="メモ"
-                          placeholder="Q1評価"
-                          value={newEvaluationMemo}
-                          onChange={(e) => setNewEvaluationMemo(e.target.value)}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Button
-                          variant="contained"
-                          onClick={saveAsHistory}
-                          fullWidth
-                          size="large"
-                          sx={{
+                {!isReadOnly && (
+                  <Card 
+                    elevation={0}
+                    sx={{ 
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      background: 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)',
+                    }}
+                  >
+                    <CardContent sx={{ pt: 2, pb: 2 }}>
+                      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
+                        <Box 
+                          sx={{ 
+                            width: 40, 
+                            height: 40, 
+                            borderRadius: 2, 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
                             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
-                            }
+                            color: 'white',
                           }}
                         >
-                          履歴に保存
-                        </Button>
+                          <CalendarIcon />
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          評価を履歴として保存
+                        </Typography>
+                      </Stack>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="評価日"
+                            type="date"
+                            value={newEvaluationDate}
+                            onChange={(e) => setNewEvaluationDate(e.target.value)}
+                            InputLabelProps={{ shrink: true }}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="メモ"
+                            placeholder="Q1評価"
+                            value={newEvaluationMemo}
+                            onChange={(e) => setNewEvaluationMemo(e.target.value)}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={12}>
+                          <Button
+                            variant="contained"
+                            onClick={saveAsHistory}
+                            fullWidth
+                            size="large"
+                            sx={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              '&:hover': {
+                                background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+                              }
+                            }}
+                          >
+                            履歴に保存
+                          </Button>
+                        </Grid>
                       </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* チャート */}
                 <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 4 }}>
@@ -2089,7 +2937,8 @@ function App() {
                       rows={6}
                       placeholder="今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
                       value={teamMemo}
-                      onChange={(e) => setTeamMemo(e.target.value)}
+                      onChange={(e) => !isReadOnly && setTeamMemo(e.target.value)}
+                      disabled={isReadOnly}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           fontSize: '0.9rem',
@@ -2164,15 +3013,17 @@ function App() {
                       <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
                         📋 能力評価基準
                       </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowCriteriaSettings(true);
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
+                      {!isReadOnly && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCriteriaSettings(true);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </Stack>
                   </AccordionSummary>
                   <AccordionDetails>
@@ -2252,12 +3103,12 @@ function App() {
                         <Grid container spacing={1.5}>
                           {Object.entries(competencyNames).map(([key, name]) => (
                             <Grid item xs={6} key={key}>
-                              <FormControl fullWidth size="small">
+                              <FormControl fullWidth size="small" disabled={isReadOnly}>
                                 <InputLabel>{name}</InputLabel>
                                 <Select
                                   value={idealProfile[key]}
                                   label={name}
-                                  onChange={(e) => handleIdealChange(key, e.target.value)}
+                                  onChange={(e) => !isReadOnly && handleIdealChange(key, e.target.value)}
                                 >
                                   {[1, 2, 3, 4, 5].map(level => (
                                     <MenuItem key={level} value={level}>Lv.{level}</MenuItem>
@@ -2295,6 +3146,7 @@ function App() {
                         calculateAverage={calculateAverage}
                         getStrengthsAndWeaknesses={getStrengthsAndWeaknesses}
                         setEmployees={setEmployees}
+                        isReadOnly={isReadOnly}
                       />
                     ))}
                   </SortableContext>
@@ -2324,16 +3176,20 @@ function App() {
                               <Typography variant="h6">
                                 {new Date(history.date).toLocaleDateString('ja-JP')}
                               </Typography>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => {
-                                  setEvaluationHistory(prev => prev.filter(h => h.id !== history.id));
-                                  addToast('履歴を削除しました', 'info');
-                                }}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
+                              {!isReadOnly && (
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => {
+                                    if (window.confirm('この履歴を削除しますか？')) {
+                                      setEvaluationHistory(prev => prev.filter(h => h.id !== history.id));
+                                      addToast('履歴を削除しました', 'info');
+                                    }
+                                  }}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              )}
                             </Stack>
                             {history.memo && (
                               <Chip label={history.memo} size="small" sx={{ mb: 2 }} />
