@@ -373,41 +373,6 @@ const acceptInvitation = async (token, userId) => {
     isExistingMember: false 
   };
 };
-  
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  
-  const { error: memberError } = await supabase
-    .from('organization_members')
-    .insert({
-      organization_id: invitation.organization_id,
-      user_id: userId,
-      role: invitation.role,
-      invited_by: invitation.invited_by,
-      joined_at: new Date().toISOString(),
-      user_email: currentUser.email,
-      user_name: currentUser.user_metadata?.full_name || null,
-      user_avatar_url: currentUser.user_metadata?.avatar_url || null
-    });
-  
-  if (memberError) {
-    console.error('Member insertion error:', memberError);
-    throw memberError;
-  }
-  
-  const { error: updateError } = await supabase
-    .from('invitations')
-    .update({ used_at: new Date().toISOString() })
-    .eq('id', invitation.id);
-  
-  if (updateError) {
-    console.error('Invitation update error:', updateError);
-    throw updateError;
-  }
-  
-  console.log('Invitation accepted successfully');
-  
-  return invitation;
-
 
 const removeMember = async (memberId) => {
   const { error } = await supabase
