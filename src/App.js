@@ -3440,7 +3440,7 @@ useEffect(() => {
 
 
                 {/* チャート */}
-                <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 4 }}>
+                <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 0 }}>
                   <CardContent sx={{ p: 3 }}>
                     <Typography 
                       variant="h5" 
