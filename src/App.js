@@ -297,7 +297,7 @@ const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
 };
 
 const acceptInvitation = async (token, userId) => {
-  console.log('Accepting invitation with token:', token); // デバッグログ追加
+  console.log('Accepting invitation with token:', token);
   
   const { data: invitation, error: invError } = await supabase
     .from('invitations')
@@ -306,7 +306,7 @@ const acceptInvitation = async (token, userId) => {
     .is('used_at', null)
     .single();
   
-  console.log('Invitation data:', invitation, invError); // デバッグログ追加
+  console.log('Invitation data:', invitation, invError);
   
   if (invError) {
     console.error('Invitation query error:', invError);
@@ -320,6 +320,27 @@ const acceptInvitation = async (token, userId) => {
   // 有効期限チェック
   if (new Date(invitation.expires_at) < new Date()) {
     throw new Error('Invitation expired');
+  }
+  
+  // 既にメンバーかチェック
+  const { data: existingMember } = await supabase
+    .from('organization_members')
+    .select('id, role')
+    .eq('organization_id', invitation.organization_id)
+    .eq('user_id', userId)
+    .single();
+  
+  if (existingMember) {
+    console.log('User is already a member of this organization');
+    
+    // 招待を使用済みにマーク
+    await supabase
+      .from('invitations')
+      .update({ used_at: new Date().toISOString() })
+      .eq('id', invitation.id);
+    
+    // 既にメンバーなので、そのまま招待情報を返す
+    return invitation;
   }
   
   // 現在のユーザー情報を取得
@@ -355,7 +376,7 @@ const acceptInvitation = async (token, userId) => {
     throw updateError;
   }
   
-  console.log('Invitation accepted successfully'); // デバッグログ追加
+  console.log('Invitation accepted successfully');
   
   return invitation;
 };
@@ -2655,9 +2676,7 @@ function App() {
       
       acceptInvitation(token, user.id)
         .then(async (invitation) => {
-          console.log('Invitation accepted:', invitation);
-          addToast('組織に参加しました', 'success');
-          window.history.pushState({}, '', '/');
+          console.log('Invitation processed:', invitation);
           
           // 組織リストを再読み込み
           const orgs = await getUserOrganizations(user.id);
@@ -2666,15 +2685,31 @@ function App() {
           
           // 参加した組織を現在の組織として設定
           const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
-          console.log('Joined organization:', joinedOrg);
+          console.log('Target organization:', joinedOrg);
           
           if (joinedOrg) {
             setCurrentOrganization(joinedOrg);
+            addToast(`${joinedOrg.name}に切り替えました`, 'success');
+          } else {
+            addToast('組織が見つかりませんでした', 'error');
           }
+          
+          window.history.pushState({}, '', '/');
         })
         .catch(error => {
           console.error('Invitation acceptance failed:', error);
-          addToast('招待の承認に失敗しました: ' + error.message, 'error');
+          
+          // エラーメッセージを分かりやすく
+          let errorMessage = '招待の承認に失敗しました';
+          if (error.message.includes('duplicate key')) {
+            errorMessage = '既にこの組織のメンバーです';
+          } else if (error.message.includes('expired')) {
+            errorMessage = '招待の有効期限が切れています';
+          } else if (error.message.includes('Invalid')) {
+            errorMessage = '無効な招待リンクです';
+          }
+          
+          addToast(errorMessage, 'error');
           window.history.pushState({}, '', '/');
         });
     }
