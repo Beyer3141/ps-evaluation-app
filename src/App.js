@@ -1068,6 +1068,7 @@ function CriteriaSettingsModal({ open, onClose, criteria, onSave }) {
 function SettingsModal({ open, onClose, settings, onSave }) {
   const [editedSettings, setEditedSettings] = useState(settings);
   const [logoPreview, setLogoPreview] = useState(settings.logoUrl);
+  const [hasChanges, setHasChanges] = useState(false); 
 
   useEffect(() => {
     setEditedSettings(settings);
@@ -1082,6 +1083,7 @@ function SettingsModal({ open, onClose, settings, onSave }) {
     reader.onloadend = () => {
       setLogoPreview(reader.result);
       setEditedSettings(prev => ({ ...prev, logoUrl: reader.result }));
+      setHasChanges(true); 
     };
     reader.readAsDataURL(file);
   };
@@ -1099,6 +1101,7 @@ function SettingsModal({ open, onClose, settings, onSave }) {
         [key]: value
       }
     }));
+    setHasChanges(true);
   };
 
   return (
@@ -1246,7 +1249,8 @@ function SettingsModal({ open, onClose, settings, onSave }) {
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={onClose}>キャンセル</Button>
-        <Button variant="contained" onClick={handleSave}>保存</Button>
+        <Button variant="contained" onClick={handleSave}
+        disabled={!hasChanges}>保存</Button>
       </DialogActions>
     </Dialog>
   );
@@ -1456,7 +1460,7 @@ function ActionBar({
       sx={{
         mb: 3,
         p: 2,
-        borderRadius: 3,
+        borderRadius: 2,
         border: '1px solid',
         borderColor: 'divider',
       }}
@@ -2969,6 +2973,12 @@ function App() {
     setSettings(newSettings);
     setHasUnsavedChanges(true);
     addToast('設定を保存しました', 'success');
+
+      // 即座にSupabaseに保存
+  setTimeout(async () => {
+    await saveToSupabase(false);
+    addToast('設定がSupabaseに反映されました', 'success');
+  }, 100);
   };
 
   // 評価基準保存ハンドラー
