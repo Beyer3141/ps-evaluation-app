@@ -173,80 +173,29 @@ const createOrganization = async (name, userId) => {
     console.log('Organization created:', org);
     
     // 2. オーナーとして自動追加
-// 現在のユーザー情報を取得
-const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
 
-const { error: memberError } = await supabase
-  .from('organization_members')
-  .insert({
-    organization_id: org.id,
-    user_id: userId,
-    role: 'owner',
-    joined_at: new Date().toISOString(),
-    user_email: currentUser.email,
-    user_name: currentUser.user_metadata?.full_name || null,
-    user_avatar_url: currentUser.user_metadata?.avatar_url || null
-  });
+    const { error: memberError } = await supabase
+      .from('organization_members')
+      .insert({
+        organization_id: org.id,
+        user_id: userId,
+        role: 'owner',
+        joined_at: new Date().toISOString(),
+        user_email: currentUser.email,
+        user_name: currentUser.user_metadata?.full_name || null,
+        user_avatar_url: currentUser.user_metadata?.avatar_url || null
+      });
+    
+    if (memberError) {
+      console.error('Member creation error:', memberError);
+      throw memberError;
+    }
     
     console.log('Owner added successfully');
     
-    // 3. 初期評価データを作成
-    const { error: evalError } = await supabase
-      .from('evaluations')
-      .insert({
-        organization_id: org.id,
-        employees: [
-          { 
-            id: 1, 
-            name: 'メンバーA', 
-            color: '#3b82f6', 
-            scores: { 
-              dataAnalysis: 3, 
-              problemSolving: 4, 
-              techKnowledge: 3, 
-              learnSpeed: 4, 
-              creativity: 3, 
-              planning: 3, 
-              communication: 4, 
-              support: 3, 
-              management: 2, 
-              strategy: 3 
-            }, 
-            isExpanded: true, 
-            memo: '' 
-          }
-        ],
-        ideal_profile: { 
-          dataAnalysis: 5, 
-          problemSolving: 5, 
-          techKnowledge: 5, 
-          learnSpeed: 5, 
-          creativity: 5, 
-          planning: 5, 
-          communication: 5, 
-          support: 5, 
-          management: 5, 
-          strategy: 5, 
-          isExpanded: false 
-        },
-        team_memo: '',
-        evaluation_history: [],
-        competency_criteria: null,
-        competency_names: null,
-        settings: { 
-          logoUrl: null, 
-          appName: '評価シート', 
-          autoSave: true, 
-          autoSaveInterval: 1 
-        }
-      });
-    
-    if (evalError) {
-      console.error('Evaluation creation error:', evalError);
-      throw evalError;
-    }
-    
-    console.log('Evaluation data created successfully');
+    // 初期評価データの作成は削除！
+    // loadFromSupabase()で自動的に作成されるようにする
     
     return org;
   } catch (error) {
@@ -2410,6 +2359,7 @@ function App() {
       if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
+        console.log('Loaded evaluation data:', data); // デバッグログ
         setEmployees(data.employees || []);
         setIdealProfile(data.ideal_profile || idealProfile);
         setTeamMemo(data.team_memo || '');
@@ -2419,9 +2369,78 @@ function App() {
         if (data.settings) setSettings(data.settings);
         setLastSaved(new Date(data.updated_at));
         addToast('データを読み込みました', 'success');
+      } else {
+        // データが存在しない場合
+        console.log('No evaluation data found for this organization');
+        
+        // オーナーの場合のみ初期データを作成
+        if (currentOrganization.role === 'owner') {
+          console.log('Creating initial evaluation data as owner');
+          const { error: createError } = await supabase
+            .from('evaluations')
+            .insert({
+              organization_id: currentOrganization.id,
+              employees: [
+                { 
+                  id: 1, 
+                  name: 'メンバーA', 
+                  color: '#3b82f6', 
+                  scores: { 
+                    dataAnalysis: 3, 
+                    problemSolving: 4, 
+                    techKnowledge: 3, 
+                    learnSpeed: 4, 
+                    creativity: 3, 
+                    planning: 3, 
+                    communication: 4, 
+                    support: 3, 
+                    management: 2, 
+                    strategy: 3 
+                  }, 
+                  isExpanded: true, 
+                  memo: '' 
+                }
+              ],
+              ideal_profile: { 
+                dataAnalysis: 5, 
+                problemSolving: 5, 
+                techKnowledge: 5, 
+                learnSpeed: 5, 
+                creativity: 5, 
+                planning: 5, 
+                communication: 5, 
+                support: 5, 
+                management: 5, 
+                strategy: 5, 
+                isExpanded: false 
+              },
+              team_memo: '',
+              evaluation_history: [],
+              competency_criteria: competencyCriteria,
+              competency_names: competencyNames,
+              settings: { 
+                logoUrl: null, 
+                appName: '評価シート', 
+                autoSave: true, 
+                autoSaveInterval: 1 
+              }
+            });
+          
+          if (createError) {
+            console.error('Failed to create initial evaluation data:', createError);
+          } else {
+            addToast('初期データを作成しました', 'info');
+            // 作成後に再読み込み
+            setTimeout(() => loadFromSupabase(), 500);
+          }
+        } else {
+          // オーナーでない場合は空データを表示
+          addToast('この組織にはまだデータがありません', 'info');
+        }
       }
     } catch (error) {
       console.error('読み込みエラー:', error);
+      addToast('データの読み込みに失敗しました', 'error');
     }
   };
 
@@ -2632,17 +2651,23 @@ function App() {
     
     if (match && user) {
       const token = match[1];
+      console.log('Processing invitation token:', token);
+      
       acceptInvitation(token, user.id)
         .then(async (invitation) => {
+          console.log('Invitation accepted:', invitation);
           addToast('組織に参加しました', 'success');
           window.history.pushState({}, '', '/');
           
           // 組織リストを再読み込み
-          await loadUserOrganizations();
+          const orgs = await getUserOrganizations(user.id);
+          console.log('Organizations after join:', orgs);
+          setOrganizations(orgs);
           
           // 参加した組織を現在の組織として設定
-          const orgs = await getUserOrganizations(user.id);
           const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
+          console.log('Joined organization:', joinedOrg);
+          
           if (joinedOrg) {
             setCurrentOrganization(joinedOrg);
           }
