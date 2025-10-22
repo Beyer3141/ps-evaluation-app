@@ -295,7 +295,34 @@ const getOrganizationMembers = async (orgId) => {
 };
 
 const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
-  // トークン生成
+  // まず、同じ組織の同じメールアドレスへの未使用招待を確認
+  const { data: existingInvitation } = await supabase
+    .from('invitations')
+    .select('*')
+    .eq('organization_id', orgId)
+    .eq('email', email)
+    .is('used_at', null)
+    .single();
+  
+  // 既存の招待がある場合
+  if (existingInvitation) {
+    // 有効期限をチェック
+    const isExpired = new Date(existingInvitation.expires_at) < new Date();
+    
+    if (!isExpired) {
+      // まだ有効なら、その招待を返す
+      console.log('既存の招待を再利用します');
+      return existingInvitation;
+    } else {
+      // 期限切れなら削除
+      await supabase
+        .from('invitations')
+        .delete()
+        .eq('id', existingInvitation.id);
+    }
+  }
+  
+  // 新しい招待を作成
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
@@ -321,6 +348,8 @@ const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
 };
 
 const acceptInvitation = async (token, userId) => {
+  console.log('Accepting invitation with token:', token); // デバッグログ追加
+  
   const { data: invitation, error: invError } = await supabase
     .from('invitations')
     .select('*')
@@ -328,31 +357,43 @@ const acceptInvitation = async (token, userId) => {
     .is('used_at', null)
     .single();
   
-  if (invError) throw invError;
-  if (!invitation) throw new Error('Invalid or expired invitation');
+  console.log('Invitation data:', invitation, invError); // デバッグログ追加
+  
+  if (invError) {
+    console.error('Invitation query error:', invError);
+    throw invError;
+  }
+  
+  if (!invitation) {
+    throw new Error('Invalid or expired invitation');
+  }
   
   // 有効期限チェック
   if (new Date(invitation.expires_at) < new Date()) {
     throw new Error('Invitation expired');
   }
   
+  // 現在のユーザー情報を取得
+  const { data: { user: currentUser } } = await supabase.auth.getUser();
+  
   // メンバーとして追加
-// 現在のユーザー情報を取得
-const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-const { error: memberError } = await supabase
-  .from('organization_members')
-  .insert({
-    organization_id: invitation.organization_id,
-    user_id: userId,
-    role: invitation.role,
-    invited_by: invitation.invited_by,
-    joined_at: new Date().toISOString(),
-    user_email: currentUser.email,
-    user_name: currentUser.user_metadata?.full_name || null,
-    user_avatar_url: currentUser.user_metadata?.avatar_url || null
-  });
-  if (memberError) throw memberError;
+  const { error: memberError } = await supabase
+    .from('organization_members')
+    .insert({
+      organization_id: invitation.organization_id,
+      user_id: userId,
+      role: invitation.role,
+      invited_by: invitation.invited_by,
+      joined_at: new Date().toISOString(),
+      user_email: currentUser.email,
+      user_name: currentUser.user_metadata?.full_name || null,
+      user_avatar_url: currentUser.user_metadata?.avatar_url || null
+    });
+  
+  if (memberError) {
+    console.error('Member insertion error:', memberError);
+    throw memberError;
+  }
   
   // 招待を使用済みに
   const { error: updateError } = await supabase
@@ -360,7 +401,12 @@ const { error: memberError } = await supabase
     .update({ used_at: new Date().toISOString() })
     .eq('id', invitation.id);
   
-  if (updateError) throw updateError;
+  if (updateError) {
+    console.error('Invitation update error:', updateError);
+    throw updateError;
+  }
+  
+  console.log('Invitation accepted successfully'); // デバッグログ追加
   
   return invitation;
 };
@@ -2519,16 +2565,22 @@ function App() {
     }
     
     setCompetencyCriteria(newCriteria);
+    
     // 能力名も更新
     const updatedNames = {};
     Object.entries(newCriteria).forEach(([key, value]) => {
       updatedNames[key] = value.name;
     });
     setCompetencyNames(updatedNames);
+    
     setHasUnsavedChanges(true);
     addToast('評価基準を更新しました', 'success');
+    
+    // 即座に保存
+    setTimeout(() => {
+      saveToSupabase(false);
+    }, 100);
   };
-
   // 認証処理
   const handleSignIn = async () => {
     try {
@@ -2581,10 +2633,19 @@ function App() {
     if (match && user) {
       const token = match[1];
       acceptInvitation(token, user.id)
-        .then(() => {
+        .then(async (invitation) => {
           addToast('組織に参加しました', 'success');
           window.history.pushState({}, '', '/');
-          loadUserOrganizations();
+          
+          // 組織リストを再読み込み
+          await loadUserOrganizations();
+          
+          // 参加した組織を現在の組織として設定
+          const orgs = await getUserOrganizations(user.id);
+          const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
+          if (joinedOrg) {
+            setCurrentOrganization(joinedOrg);
+          }
         })
         .catch(error => {
           console.error('Invitation acceptance failed:', error);
