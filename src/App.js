@@ -491,6 +491,16 @@ function CreateOrganizationModal({ open, onClose, onCreate }) {
   );
 }
 
+// 組織削除関数（createOrganization関数の後あたりに追加）
+const deleteOrganization = async (orgId) => {
+  const { error } = await supabase
+    .from('organizations')
+    .delete()
+    .eq('id', orgId);
+  
+  if (error) throw error;
+};
+
 // チームメンバー管理モーダル
 function TeamMembersModal({ open, onClose, organization, members, onInvite, onRemove, currentUserId }) {
   const [inviteEmail, setInviteEmail] = useState('');
@@ -1488,6 +1498,7 @@ function MainLayout({
   onOpenTeamMembers,
   onSwitchOrganization,
   organizationMembers,
+  onDeleteOrganization,
 }) {
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -1509,6 +1520,9 @@ function MainLayout({
   const handleSignOut = () => {
     handleMenuClose();
     onSignOut();
+  };
+  const handleDeleteOrganization = () => {
+    onDeleteOrganization();
   };
 
   // ナビゲーションメニューアイテム
@@ -1749,40 +1763,61 @@ function MainLayout({
 
           {/* ユーザーメニュー */}
           <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleMenuClose}
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
-            }}
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right',
-            }}
-          >
-            <Box sx={{ px: 2, py: 1.5, minWidth: 200 }}>
-              <Typography variant="subtitle2" fontWeight={600}>
-                {user?.user_metadata?.full_name || user?.email}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user?.email}
-              </Typography>
-            </Box>
-            <Divider />
-            <MenuItem onClick={onSwitchOrganization}>
-              <ListItemIcon>
-                <SwitchIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>組織を切り替え</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={handleSignOut}>
-              <ListItemIcon>
-                <LogoutIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>ログアウト</ListItemText>
-            </MenuItem>
-          </Menu>
+  anchorEl={anchorEl}
+  open={Boolean(anchorEl)}
+  onClose={handleMenuClose}
+  anchorOrigin={{
+    vertical: 'bottom',
+    horizontal: 'right',
+  }}
+  transformOrigin={{
+    vertical: 'top',
+    horizontal: 'right',
+  }}
+>
+  <Box sx={{ px: 2, py: 1.5, minWidth: 200 }}>
+    <Typography variant="subtitle2" fontWeight={600}>
+      {user?.user_metadata?.full_name || user?.email}
+    </Typography>
+    <Typography variant="caption" color="text.secondary">
+      {user?.email}
+    </Typography>
+  </Box>
+  <Divider />
+  <MenuItem onClick={onSwitchOrganization}>
+    <ListItemIcon>
+      <SwitchIcon fontSize="small" />
+    </ListItemIcon>
+    <ListItemText>組織を切り替え</ListItemText>
+  </MenuItem>
+  
+  {/* 組織削除メニューを追加 */}
+  {currentOrganization?.role === 'owner' && (
+    <MenuItem 
+      onClick={() => {
+        handleMenuClose();
+        // 削除確認ダイアログを表示
+        if (window.confirm(`本当に「${currentOrganization.name}」を削除しますか？\n\nこの操作は取り消せません。すべてのデータが完全に削除されます。`)) {
+          handleDeleteOrganization();
+        }
+      }}
+      sx={{ color: 'error.main' }}
+    >
+      <ListItemIcon>
+        <DeleteIcon fontSize="small" color="error" />
+      </ListItemIcon>
+      <ListItemText>組織を削除</ListItemText>
+    </MenuItem>
+  )}
+  
+  <Divider />
+  <MenuItem onClick={handleSignOut}>
+    <ListItemIcon>
+      <LogoutIcon fontSize="small" />
+    </ListItemIcon>
+    <ListItemText>ログアウト</ListItemText>
+  </MenuItem>
+</Menu>
         </Toolbar>
       </AppBar>
 
@@ -2102,6 +2137,33 @@ function App() {
     } catch (error) {
       console.error('Failed to create organization:', error);
       addToast('組織の作成に失敗しました: ' + error.message, 'error');
+    }
+  };
+
+  const handleDeleteOrganization = async () => {
+    if (!currentOrganization) return;
+    
+    try {
+      await deleteOrganization(currentOrganization.id);
+      
+      // 組織リストから削除
+      setOrganizations(prev => prev.filter(org => org.id !== currentOrganization.id));
+      
+      // 現在の組織をクリア
+      setCurrentOrganization(null);
+      
+      addToast('組織を削除しました', 'success');
+      
+      // 他の組織があればそちらに切り替え、なければ作成画面へ
+      const remainingOrgs = organizations.filter(org => org.id !== currentOrganization.id);
+      if (remainingOrgs.length > 0) {
+        setCurrentOrganization(remainingOrgs[0]);
+      } else {
+        setShowCreateOrg(true);
+      }
+    } catch (error) {
+      console.error('Failed to delete organization:', error);
+      addToast('組織の削除に失敗しました: ' + error.message, 'error');
     }
   };
 
@@ -2788,6 +2850,7 @@ function App() {
         onOpenTeamMembers={() => setShowTeamMembers(true)}
         onSwitchOrganization={() => setShowOrgSelector(true)}
         organizationMembers={organizationMembers}
+        onDeleteOrganization={handleDeleteOrganization} 
       >
         <Container maxWidth="xl" disableGutters>
           {/* 閲覧専用警告 */}
