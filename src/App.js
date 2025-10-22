@@ -2057,15 +2057,18 @@ function App() {
     
     try {
       const orgs = await getUserOrganizations(user.id);
+      console.log('Loaded organizations:', orgs);
       setOrganizations(orgs);
       
       if (orgs.length > 0) {
-        // 最初の組織を選択
+        // 現在の組織が未設定の場合のみ設定
         if (!currentOrganization) {
           setCurrentOrganization(orgs[0]);
         }
+        setShowOrgSelector(false);  // ← これを追加！
       } else {
         // 組織がない場合は作成を促す
+        setShowOrgSelector(false);  // ← これを追加！
         setShowCreateOrg(true);
       }
     } catch (error) {
@@ -2078,19 +2081,27 @@ function App() {
     try {
       console.log('handleCreateOrganization called with:', name);
       const org = await createOrganization(name, user.id);
-      console.log('Organization created, adding to state:', org);
+      console.log('Organization created:', org);
+      
+      const orgWithRole = { ...org, role: 'owner' };
       
       // 組織リストに追加
-      setOrganizations(prev => [...prev, { ...org, role: 'owner' }]);
+      setOrganizations(prev => [...prev, orgWithRole]);
       
       // 現在の組織として設定
-      setCurrentOrganization({ ...org, role: 'owner' });
+      setCurrentOrganization(orgWithRole);
+      
+      // モーダルを閉じる
+      setShowCreateOrg(false);
+      setShowOrgSelector(false);  // ← これを追加！
       
       addToast('組織を作成しました', 'success');
-      setShowCreateOrg(false);
       
-      // データを読み込む
-      await loadFromSupabase();
+      // 少し待ってからデータを読み込む
+      setTimeout(() => {
+        loadFromSupabase();
+      }, 500);
+      
     } catch (error) {
       console.error('Failed to create organization:', error);
       addToast('組織の作成に失敗しました: ' + error.message, 'error');
@@ -2647,23 +2658,50 @@ function App() {
   }
 
   // 組織未選択
-  if (!currentOrganization) {
+  if (!currentOrganization && !showCreateOrg) {
     return (
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <CircularProgress />
-        </Box>
         <OrganizationSelectorModal
-          open={showOrgSelector || organizations.length === 0}
-          onClose={() => setShowOrgSelector(false)}
+          open={organizations.length === 0 || showOrgSelector}
+          onClose={() => {
+            if (organizations.length > 0) {
+              setShowOrgSelector(false);
+            }
+          }}
           organizations={organizations}
           onSelect={handleSelectOrganization}
-          onCreateNew={() => setShowCreateOrg(true)}
+          onCreateNew={() => {
+            setShowOrgSelector(false);
+            setShowCreateOrg(true);
+          }}
         />
         <CreateOrganizationModal
+  open={showCreateOrg}
+  onClose={() => {
+    // 組織が1つ以上ある場合のみ閉じられる
+    if (organizations.length > 0) {
+      setShowCreateOrg(false);
+    }
+  }}
+  onCreate={handleCreateOrganization}
+/>
+      </ThemeProvider>
+    );
+  }
+  
+  // 組織作成中の表示を追加
+  if (showCreateOrg && !currentOrganization) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <CreateOrganizationModal
           open={showCreateOrg}
-          onClose={() => setShowCreateOrg(false)}
+          onClose={() => {
+            if (organizations.length > 0) {
+              setShowCreateOrg(false);
+            }
+          }}
           onCreate={handleCreateOrganization}
         />
       </ThemeProvider>
