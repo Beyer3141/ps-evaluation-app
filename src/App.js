@@ -194,9 +194,6 @@ const createOrganization = async (name, userId) => {
     
     console.log('Owner added successfully');
     
-    // 初期評価データの作成は削除！
-    // loadFromSupabase()で自動的に作成されるようにする
-    
     return org;
   } catch (error) {
     console.error('Failed to create organization:', error);
@@ -225,12 +222,11 @@ const getUserOrganizations = async (userId) => {
 const getOrganizationMembers = async (orgId) => {
   const { data, error } = await supabase
     .from('organization_members')
-    .select('*')  // 全カラムを取得
+    .select('*')
     .eq('organization_id', orgId);
   
   if (error) throw error;
   
-  // user情報を整形
   return data.map(member => ({
     ...member,
     user: {
@@ -244,7 +240,6 @@ const getOrganizationMembers = async (orgId) => {
 };
 
 const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
-  // まず、同じ組織の同じメールアドレスへの未使用招待を確認
   const { data: existingInvitation } = await supabase
     .from('invitations')
     .select('*')
@@ -253,17 +248,13 @@ const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
     .is('used_at', null)
     .single();
   
-  // 既存の招待がある場合
   if (existingInvitation) {
-    // 有効期限をチェック
     const isExpired = new Date(existingInvitation.expires_at) < new Date();
     
     if (!isExpired) {
-      // まだ有効なら、その招待を返す
       console.log('既存の招待を再利用します');
       return existingInvitation;
     } else {
-      // 期限切れなら削除
       await supabase
         .from('invitations')
         .delete()
@@ -271,13 +262,12 @@ const inviteUserToOrganization = async (orgId, email, role, invitedBy) => {
     }
   }
   
-  // 新しい招待を作成
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
   
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // 7日間有効
+  expiresAt.setDate(expiresAt.getDate() + 7);
   
   const { data, error } = await supabase
     .from('invitations')
@@ -317,12 +307,10 @@ const acceptInvitation = async (token, userId) => {
     throw new Error('Invalid or expired invitation');
   }
   
-  // 有効期限チェック
   if (new Date(invitation.expires_at) < new Date()) {
     throw new Error('Invitation expired');
   }
   
-  // 既にメンバーかチェック
   const { data: existingMember } = await supabase
     .from('organization_members')
     .select('id, role')
@@ -333,20 +321,16 @@ const acceptInvitation = async (token, userId) => {
   if (existingMember) {
     console.log('User is already a member of this organization');
     
-    // 招待を使用済みにマーク
     await supabase
       .from('invitations')
       .update({ used_at: new Date().toISOString() })
       .eq('id', invitation.id);
     
-    // 既にメンバーなので、そのまま招待情報を返す
     return invitation;
   }
   
-  // 現在のユーザー情報を取得
   const { data: { user: currentUser } } = await supabase.auth.getUser();
   
-  // メンバーとして追加
   const { error: memberError } = await supabase
     .from('organization_members')
     .insert({
@@ -365,7 +349,6 @@ const acceptInvitation = async (token, userId) => {
     throw memberError;
   }
   
-  // 招待を使用済みに
   const { error: updateError } = await supabase
     .from('invitations')
     .update({ used_at: new Date().toISOString() })
@@ -386,6 +369,15 @@ const removeMember = async (memberId) => {
     .from('organization_members')
     .delete()
     .eq('id', memberId);
+  
+  if (error) throw error;
+};
+
+const deleteOrganization = async (orgId) => {
+  const { error } = await supabase
+    .from('organizations')
+    .delete()
+    .eq('id', orgId);
   
   if (error) throw error;
 };
@@ -507,15 +499,94 @@ function CreateOrganizationModal({ open, onClose, onCreate }) {
   );
 }
 
-// 組織削除関数（createOrganization関数の後あたりに追加）
-const deleteOrganization = async (orgId) => {
-  const { error } = await supabase
-    .from('organizations')
-    .delete()
-    .eq('id', orgId);
-  
-  if (error) throw error;
-};
+// 通知モーダル
+function NotificationsModal({ open, onClose, notifications, onMarkAsRead, onMarkAllAsRead }) {
+  const getActionIcon = (actionType) => {
+    switch (actionType) {
+      case 'evaluation_updated':
+        return <EditIcon fontSize="small" color="primary" />;
+      case 'member_added':
+        return <PersonAddIcon fontSize="small" color="success" />;
+      case 'member_removed':
+        return <DeleteIcon fontSize="small" color="error" />;
+      case 'member_invited':
+        return <EmailIcon fontSize="small" color="info" />;
+      case 'criteria_updated':
+        return <EditIcon fontSize="small" color="secondary" />;
+      default:
+        return <InfoIcon fontSize="small" />;
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <NotificationsIcon color="primary" />
+            <Typography variant="h6">通知</Typography>
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            {notifications.some(n => !n.is_read) && (
+              <Button size="small" onClick={onMarkAllAsRead}>
+                全て既読
+              </Button>
+            )}
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </DialogTitle>
+      <DialogContent dividers>
+        {notifications.length === 0 ? (
+          <Alert severity="info">通知はありません</Alert>
+        ) : (
+          <List>
+            {notifications.map((notification) => (
+              <ListItem
+                key={notification.id}
+                sx={{
+                  bgcolor: notification.is_read ? 'transparent' : 'action.hover',
+                  borderRadius: 1,
+                  mb: 1,
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: 'action.selected' }
+                }}
+                onClick={() => {
+                  if (!notification.is_read) {
+                    onMarkAsRead(notification.id);
+                  }
+                }}
+              >
+                <ListItemIcon>
+                  {getActionIcon(notification.action_type)}
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Typography variant="body2" fontWeight={notification.is_read ? 400 : 600}>
+                        {notification.message}
+                      </Typography>
+                      {!notification.is_read && (
+                        <Chip label="未読" size="small" color="primary" sx={{ height: 18 }} />
+                      )}
+                    </Stack>
+                  }
+                  secondary={
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(notification.created_at).toLocaleString('ja-JP')}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // チームメンバー管理モーダル
 function TeamMembersModal({ open, onClose, organization, members, onInvite, onRemove, currentUserId }) {
@@ -543,93 +614,9 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
     }
   };
 
-  function NotificationsModal({ open, onClose, notifications, onMarkAsRead, onMarkAllAsRead }) {
-    const getActionIcon = (actionType) => {
-      switch (actionType) {
-        case 'evaluation_updated':
-          return <EditIcon fontSize="small" color="primary" />;
-        case 'member_added':
-          return <PersonAddIcon fontSize="small" color="success" />;
-        case 'member_removed':
-          return <DeleteIcon fontSize="small" color="error" />;
-        default:
-          return <InfoIcon fontSize="small" />;
-      }
-    };
-  
-    return (
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <NotificationsIcon color="primary" />
-              <Typography variant="h6">通知</Typography>
-            </Stack>
-            <Stack direction="row" spacing={1}>
-              {notifications.some(n => !n.is_read) && (
-                <Button size="small" onClick={onMarkAllAsRead}>
-                  全て既読
-                </Button>
-              )}
-              <IconButton onClick={onClose} size="small">
-                <CloseIcon />
-              </IconButton>
-            </Stack>
-          </Stack>
-        </DialogTitle>
-        <DialogContent dividers>
-          {notifications.length === 0 ? (
-            <Alert severity="info">通知はありません</Alert>
-          ) : (
-            <List>
-              {notifications.map((notification) => (
-                <ListItem
-                  key={notification.id}
-                  sx={{
-                    bgcolor: notification.is_read ? 'transparent' : 'action.hover',
-                    borderRadius: 1,
-                    mb: 1,
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.selected' }
-                  }}
-                  onClick={() => {
-                    if (!notification.is_read) {
-                      onMarkAsRead(notification.id);
-                    }
-                  }}
-                >
-                  <ListItemIcon>
-                    {getActionIcon(notification.action_type)}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="body2" fontWeight={notification.is_read ? 400 : 600}>
-                          {notification.message}
-                        </Typography>
-                        {!notification.is_read && (
-                          <Chip label="未読" size="small" color="primary" sx={{ height: 18 }} />
-                        )}
-                      </Stack>
-                    }
-                    secondary={
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(notification.created_at).toLocaleString('ja-JP')}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   const copyInviteLink = () => {
     navigator.clipboard.writeText(inviteLink);
-    alert('リンクをコピーしました！');
+    alert('リンクをコピーしました!');
   };
 
   const currentUserRole = members.find(m => m.user_id === currentUserId)?.role;
@@ -650,7 +637,6 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
       </DialogTitle>
       <DialogContent dividers>
         <Stack spacing={3}>
-          {/* メンバー招待セクション */}
           {canManageMembers && (
             <Card variant="outlined">
               <CardContent>
@@ -720,7 +706,6 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
             </Card>
           )}
 
-          {/* 権限説明 */}
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle2" fontWeight={600} gutterBottom>
@@ -747,7 +732,6 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
             </CardContent>
           </Card>
 
-          {/* メンバーリスト */}
           <TableContainer>
             <Table>
               <TableHead>
@@ -809,7 +793,7 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
                           size="small"
                           color="error"
                           onClick={() => {
-                            if (window.confirm('本当にこのメンバーを削除しますか？')) {
+                            if (window.confirm('本当にこのメンバーを削除しますか?')) {
                               onRemove(member.id);
                             }
                           }}
@@ -1084,7 +1068,6 @@ function SettingsModal({ open, onClose, settings, onSave }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // 画像のプレビュー
     const reader = new FileReader();
     reader.onloadend = () => {
       setLogoPreview(reader.result);
@@ -1096,6 +1079,16 @@ function SettingsModal({ open, onClose, settings, onSave }) {
   const handleSave = () => {
     onSave(editedSettings);
     onClose();
+  };
+
+  const handleLabelChange = (key, value) => {
+    setEditedSettings(prev => ({
+      ...prev,
+      labels: {
+        ...prev.labels,
+        [key]: value
+      }
+    }));
   };
 
   return (
@@ -1166,6 +1159,55 @@ function SettingsModal({ open, onClose, settings, onSave }) {
             onChange={(e) => setEditedSettings(prev => ({ ...prev, appName: e.target.value }))}
           />
 
+          <Divider />
+
+          {/* 編集可能なラベル */}
+          <Typography variant="subtitle2" gutterBottom>
+            画面ラベルのカスタマイズ
+          </Typography>
+
+          <TextField
+            fullWidth
+            label="チャートタイトル"
+            value={editedSettings.labels?.chartTitle || '📊 能力レーダーチャート'}
+            onChange={(e) => handleLabelChange('chartTitle', e.target.value)}
+            helperText="チャート上部に表示されるタイトル"
+          />
+
+          <TextField
+            fullWidth
+            label="評価基準セクションタイトル"
+            value={editedSettings.labels?.criteriaTitle || '📋 能力評価基準'}
+            onChange={(e) => handleLabelChange('criteriaTitle', e.target.value)}
+            helperText="評価基準セクションのタイトル"
+          />
+
+          <TextField
+            fullWidth
+            label="チームメモセクションタイトル"
+            value={editedSettings.labels?.teamMemoTitle || '📝 チーム全体のメモ'}
+            onChange={(e) => handleLabelChange('teamMemoTitle', e.target.value)}
+            helperText="チームメモエリアのタイトル"
+          />
+
+          <TextField
+            fullWidth
+            label="メンバー管理セクションタイトル"
+            value={editedSettings.labels?.memberManagementTitle || 'メンバー管理'}
+            onChange={(e) => handleLabelChange('memberManagementTitle', e.target.value)}
+            helperText="メンバーリストのタイトル"
+          />
+
+          <TextField
+            fullWidth
+            label="理想形セクションタイトル"
+            value={editedSettings.labels?.idealProfileTitle || '理想形'}
+            onChange={(e) => handleLabelChange('idealProfileTitle', e.target.value)}
+            helperText="理想形カードのタイトル"
+          />
+
+          <Divider />
+
           {/* 自動保存設定 */}
           <FormControlLabel
             control={
@@ -1182,7 +1224,7 @@ function SettingsModal({ open, onClose, settings, onSave }) {
             <TextField
               fullWidth
               type="number"
-              label="自動保存間隔（分）"
+              label="自動保存間隔(分)"
               value={editedSettings.autoSaveInterval}
               onChange={(e) => setEditedSettings(prev => ({ ...prev, autoSaveInterval: parseInt(e.target.value) }))}
               InputProps={{
@@ -1386,6 +1428,8 @@ function ActionBar({
   chartType,
   onChartTypeChange,
   isReadOnly,
+  settings,
+  onOpenSettings,
 }) {
   return (
     <Paper
@@ -1410,22 +1454,22 @@ function ActionBar({
           }}
         >
           <Box>
-  <Typography 
-    variant="h5" 
-    onClick={onOpenSettings}  // クリックで設定を開く
-    sx={{ 
-      fontWeight: 500, 
-      mb: 0.5,
-      cursor: 'pointer',
-      '&:hover': { color: 'primary.main' }
-    }}
-  >
-    {settings.appName || '評価チャート'}
-  </Typography>
-  <Typography variant="body2" color="text.secondary">
-    10の能力を5段階で評価し、視覚的に強み・弱みを把握する
-  </Typography>
-</Box>
+            <Typography 
+              variant="h5" 
+              onClick={onOpenSettings}
+              sx={{ 
+                fontWeight: 500, 
+                mb: 0.5,
+                cursor: 'pointer',
+                '&:hover': { color: 'primary.main' }
+              }}
+            >
+              {settings.appName || '評価チャート'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              10の能力を5段階で評価し、視覚的に強み・弱みを把握する
+            </Typography>
+          </Box>
 
           {/* ステータス */}
           <Stack direction="row" spacing={1} alignItems="center">
@@ -1608,9 +1652,9 @@ function MainLayout({
   onSwitchOrganization,
   organizationMembers,
   onDeleteOrganization,
-  notifications,           // 追加
-  unreadCount,            // 追加
-  onOpenNotifications, 
+  notifications,
+  unreadCount,
+  onOpenNotifications,
 }) {
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -1633,11 +1677,11 @@ function MainLayout({
     handleMenuClose();
     onSignOut();
   };
+
   const handleDeleteOrganization = () => {
     onDeleteOrganization();
   };
 
-  // ナビゲーションメニューアイテム
   const menuItems = [
     { id: 'current', icon: <HomeIcon />, label: '現在の評価' },
     { id: 'history', icon: <HistoryIcon />, label: '成長履歴' },
@@ -1646,7 +1690,6 @@ function MainLayout({
     { id: 'dashboard', icon: <DashboardIcon />, label: 'チーム分析' },
   ];
 
-  // サイドバーコンテンツ
   const drawer = (
     <Box 
       sx={{ 
@@ -1659,27 +1702,25 @@ function MainLayout({
         py: 2,
       }}
     >
-      {/* ロゴ */}
       <Box sx={{ px: 2, mb: 3, display: 'flex', justifyContent: 'center' }}>
-  <Avatar 
-    src={settings.logoUrl}
-    onClick={onOpenSettings}  // クリックで設定を開く
-    sx={{ 
-      width: 48,
-      height: 48,
-      background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      fontSize: '1.25rem',
-      fontWeight: 700,
-      cursor: 'pointer',
-      '&:hover': { opacity: 0.8 }
-    }}
-  >
-    {!settings.logoUrl && (settings.appName?.[0] || 'PS')}
-  </Avatar>
-</Box>
+        <Avatar 
+          src={settings.logoUrl}
+          onClick={onOpenSettings}
+          sx={{ 
+            width: 48,
+            height: 48,
+            background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            fontSize: '1.25rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            '&:hover': { opacity: 0.8 }
+          }}
+        >
+          {!settings.logoUrl && (settings.appName?.[0] || 'PS')}
+        </Avatar>
+      </Box>
       <Divider sx={{ mb: 2 }} />
 
-      {/* ナビゲーションメニュー - アイコンのみ */}
       <Box sx={{ flex: 1, px: 1.5 }}>
         {menuItems.map((item) => (
           <MuiTooltip key={item.id} title={item.label} placement="right" arrow>
@@ -1712,7 +1753,6 @@ function MainLayout({
 
       <Divider sx={{ mb: 2 }} />
 
-      {/* チームボタン */}
       <Box sx={{ px: 1.5, mb: 1 }}>
         <MuiTooltip title="チーム管理" placement="right" arrow>
           <IconButton
@@ -1734,7 +1774,6 @@ function MainLayout({
         </MuiTooltip>
       </Box>
 
-      {/* 設定ボタン */}
       <Box sx={{ px: 1.5 }}>
         <MuiTooltip title="設定" placement="right" arrow>
           <IconButton
@@ -1758,7 +1797,6 @@ function MainLayout({
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      {/* トップバー */}
       <AppBar
         position="fixed"
         sx={{
@@ -1769,7 +1807,6 @@ function MainLayout({
         }}
       >
         <Toolbar>
-          {/* モバイルメニューボタン */}
           <IconButton
             color="inherit"
             edge="start"
@@ -1779,7 +1816,6 @@ function MainLayout({
             <MenuIcon />
           </IconButton>
 
-          {/* 組織情報 */}
           <Box sx={{ mr: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
             <BusinessIcon color="action" />
             <Box>
@@ -1797,7 +1833,6 @@ function MainLayout({
             </IconButton>
           </Box>
 
-          {/* 検索バー */}
           <Box
             sx={{
               position: 'relative',
@@ -1841,9 +1876,7 @@ function MainLayout({
             />
           </Box>
 
-          {/* 右側のアイコン */}
           <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-            {/* メンバーアバター */}
             <MuiTooltip title="チームメンバー">
               <IconButton onClick={onOpenTeamMembers}>
                 <AvatarGroup max={3} sx={{ '& .MuiAvatar-root': { width: 28, height: 28, fontSize: '0.875rem' } }}>
@@ -1861,15 +1894,11 @@ function MainLayout({
             </MuiTooltip>
 
             <IconButton color="inherit" onClick={onOpenNotifications}>
-  <Badge badgeContent={unreadCount} color="error">
-    <NotificationsIcon />
-  </Badge>
-</IconButton>
-            <IconButton color="inherit" onClick={onOpenNotifications}>
-  <Badge badgeContent={unreadCount} color="error">
-    <NotificationsIcon />
-  </Badge>
-</IconButton>
+              <Badge badgeContent={unreadCount} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+
             <IconButton color="inherit" onClick={handleMenuOpen}>
               <Avatar 
                 src={user?.user_metadata?.avatar_url}
@@ -1880,72 +1909,67 @@ function MainLayout({
             </IconButton>
           </Box>
 
-          {/* ユーザーメニュー */}
           <Menu
-  anchorEl={anchorEl}
-  open={Boolean(anchorEl)}
-  onClose={handleMenuClose}
-  anchorOrigin={{
-    vertical: 'bottom',
-    horizontal: 'right',
-  }}
-  transformOrigin={{
-    vertical: 'top',
-    horizontal: 'right',
-  }}
->
-  <Box sx={{ px: 2, py: 1.5, minWidth: 200 }}>
-    <Typography variant="subtitle2" fontWeight={600}>
-      {user?.user_metadata?.full_name || user?.email}
-    </Typography>
-    <Typography variant="caption" color="text.secondary">
-      {user?.email}
-    </Typography>
-  </Box>
-  <Divider />
-  <MenuItem onClick={onSwitchOrganization}>
-    <ListItemIcon>
-      <SwitchIcon fontSize="small" />
-    </ListItemIcon>
-    <ListItemText>組織を切り替え</ListItemText>
-  </MenuItem>
-  
-  {/* 組織削除メニューを追加 */}
-  {currentOrganization?.role === 'owner' && (
-    <MenuItem 
-      onClick={() => {
-        handleMenuClose();
-        // 削除確認ダイアログを表示
-        if (window.confirm(`本当に「${currentOrganization.name}」を削除しますか？\n\nこの操作は取り消せません。すべてのデータが完全に削除されます。`)) {
-          handleDeleteOrganization();
-        }
-      }}
-      sx={{ color: 'error.main' }}
-    >
-      <ListItemIcon>
-        <DeleteIcon fontSize="small" color="error" />
-      </ListItemIcon>
-      <ListItemText>組織を削除</ListItemText>
-    </MenuItem>
-  )}
-  
-  <Divider />
-  <MenuItem onClick={handleSignOut}>
-    <ListItemIcon>
-      <LogoutIcon fontSize="small" />
-    </ListItemIcon>
-    <ListItemText>ログアウト</ListItemText>
-  </MenuItem>
-</Menu>
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+          >
+            <Box sx={{ px: 2, py: 1.5, minWidth: 200 }}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                {user?.user_metadata?.full_name || user?.email}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user?.email}
+              </Typography>
+            </Box>
+            <Divider />
+            <MenuItem onClick={onSwitchOrganization}>
+              <ListItemIcon>
+                <SwitchIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>組織を切り替え</ListItemText>
+            </MenuItem>
+            
+            {currentOrganization?.role === 'owner' && (
+              <MenuItem 
+                onClick={() => {
+                  handleMenuClose();
+                  if (window.confirm(`本当に「${currentOrganization.name}」を削除しますか?\n\nこの操作は取り消せません。すべてのデータが完全に削除されます。`)) {
+                    handleDeleteOrganization();
+                  }
+                }}
+                sx={{ color: 'error.main' }}
+              >
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" color="error" />
+                </ListItemIcon>
+                <ListItemText>組織を削除</ListItemText>
+              </MenuItem>
+            )}
+            
+            <Divider />
+            <MenuItem onClick={handleSignOut}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>ログアウト</ListItemText>
+            </MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
 
-      {/* サイドナビゲーション */}
       <Box
         component="nav"
         sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
       >
-        {/* モバイル用ドロワー */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -1964,7 +1988,6 @@ function MainLayout({
           {drawer}
         </Drawer>
 
-        {/* デスクトップ用固定ドロワー */}
         <Drawer
           variant="permanent"
           sx={{
@@ -1980,7 +2003,6 @@ function MainLayout({
         </Drawer>
       </Box>
 
-      {/* メインコンテンツ */}
       <Box
         component="main"
         sx={{
@@ -2014,7 +2036,7 @@ function App() {
 
   // State管理
   const [employees, setEmployees] = useState([
-    { id: 1, name: 'メンバーA', color: '#3b82f6', scores: { dataAnalysis: 3, problemSolving: 4, techKnowledge: 3, learnSpeed: 4, creativity: 3, planning: 3, communication: 4, support: 3, management: 2, strategy: 3 }, isExpanded: true, memo: '' }
+    { id: 1, name: 'メンバーA', color: '#3b82f6', scores: { dataAnalysis: 3, problemSolving: 4, techKnowledge: 3, learnSpeed: 4, creativity: 3, planning: 3, communication: 4, support: 3, management: 2, strategy: 3 }, isExpanded: false, memo: '' }
   ]);
   
   const [idealProfile, setIdealProfile] = useState({ dataAnalysis: 5, problemSolving: 5, techKnowledge: 5, learnSpeed: 5, creativity: 5, planning: 5, communication: 5, support: 5, management: 5, strategy: 5, isExpanded: false });
@@ -2038,18 +2060,33 @@ function App() {
   const [showCriteriaSettings, setShowCriteriaSettings] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [notifications, setNotifications] = useState([]);
-const [unreadCount, setUnreadCount] = useState(0);
-const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   
   const chartRef = useRef(null);
   const nextId = useRef(2);
+
+  // UI状態の管理（折りたたみ状態）
+  const [uiState, setUiState] = useState({
+    showCriteria: false,
+    showTeamMemo: false,
+    showIdealProfile: false,
+    showMemberList: true,
+  });
 
   // 設定State
   const [settings, setSettings] = useState({
     logoUrl: null,
     appName: 'PS能力評価チャート',
     autoSave: true,
-    autoSaveInterval: 1, // 分
+    autoSaveInterval: 1,
+    labels: {
+      chartTitle: '📊 能力レーダーチャート',
+      criteriaTitle: '📋 能力評価基準',
+      teamMemoTitle: '📝 チーム全体のメモ',
+      memberManagementTitle: 'メンバー管理',
+      idealProfileTitle: '理想形'
+    }
   });
 
   // 能力名の定義
@@ -2190,19 +2227,118 @@ const [showNotifications, setShowNotifications] = useState(false);
     
     const query = searchQuery.toLowerCase();
     return employees.filter(emp => {
-      // 名前での検索
       if (emp.name.toLowerCase().includes(query)) return true;
-      
-      // メモでの検索
       if (emp.memo && emp.memo.toLowerCase().includes(query)) return true;
       
-      // 能力名での検索
       const matchesCompetency = Object.entries(competencyNames).some(([key, name]) => 
         name.toLowerCase().includes(query)
       );
       
       return matchesCompetency;
     });
+  };
+
+  // 通知を作成する関数
+  const createNotification = async (actionType, message, metadata = {}) => {
+    if (!user || !currentOrganization) return;
+    
+    try {
+      const otherMembers = organizationMembers.filter(m => m.user_id !== user.id);
+      
+      // 詳細な通知メッセージを生成
+      let detailedMessage = message;
+      
+      if (actionType === 'evaluation_updated' && metadata.changes) {
+        const changeDetails = [];
+        if (metadata.changes.memberCount) {
+          changeDetails.push(`メンバー数: ${metadata.changes.memberCount}`);
+        }
+        if (metadata.changes.updatedMembers) {
+          changeDetails.push(`更新したメンバー: ${metadata.changes.updatedMembers.join(', ')}`);
+        }
+        if (changeDetails.length > 0) {
+          detailedMessage += ` (${changeDetails.join(', ')})`;
+        }
+      }
+      
+      const notificationsToInsert = otherMembers.map(member => ({
+        organization_id: currentOrganization.id,
+        user_id: member.user_id,
+        actor_id: user.id,
+        actor_name: user.user_metadata?.full_name || user.email,
+        actor_email: user.email,
+        action_type: actionType,
+        message: detailedMessage,
+        metadata: JSON.stringify(metadata),
+        is_read: false
+      }));
+      
+      if (notificationsToInsert.length > 0) {
+        const { error } = await supabase
+          .from('notifications')
+          .insert(notificationsToInsert);
+        
+        if (error) console.error('Notification creation error:', error);
+      }
+    } catch (error) {
+      console.error('Failed to create notification:', error);
+    }
+  };
+
+  // 通知を読み込む関数
+  const loadNotifications = async () => {
+    if (!user || !currentOrganization) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('organization_id', currentOrganization.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      
+      setNotifications(data || []);
+      setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  };
+
+  // 通知を既読にする関数
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+      
+      if (error) throw error;
+      
+      await loadNotifications();
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  // 全ての通知を既読にする関数
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user.id)
+        .eq('organization_id', currentOrganization.id)
+        .eq('is_read', false);
+      
+      if (error) throw error;
+      
+      await loadNotifications();
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
   };
 
   // 組織関連ハンドラー
@@ -2215,14 +2351,12 @@ const [showNotifications, setShowNotifications] = useState(false);
       setOrganizations(orgs);
       
       if (orgs.length > 0) {
-        // 現在の組織が未設定の場合のみ設定
         if (!currentOrganization) {
           setCurrentOrganization(orgs[0]);
         }
-        setShowOrgSelector(false);  // ← これを追加！
+        setShowOrgSelector(false);
       } else {
-        // 組織がない場合は作成を促す
-        setShowOrgSelector(false);  // ← これを追加！
+        setShowOrgSelector(false);
         setShowCreateOrg(true);
       }
     } catch (error) {
@@ -2239,19 +2373,14 @@ const [showNotifications, setShowNotifications] = useState(false);
       
       const orgWithRole = { ...org, role: 'owner' };
       
-      // 組織リストに追加
       setOrganizations(prev => [...prev, orgWithRole]);
-      
-      // 現在の組織として設定
       setCurrentOrganization(orgWithRole);
       
-      // モーダルを閉じる
       setShowCreateOrg(false);
-      setShowOrgSelector(false);  // ← これを追加！
+      setShowOrgSelector(false);
       
       addToast('組織を作成しました', 'success');
       
-      // 少し待ってからデータを読み込む
       setTimeout(() => {
         loadFromSupabase();
       }, 500);
@@ -2268,15 +2397,11 @@ const [showNotifications, setShowNotifications] = useState(false);
     try {
       await deleteOrganization(currentOrganization.id);
       
-      // 組織リストから削除
       setOrganizations(prev => prev.filter(org => org.id !== currentOrganization.id));
-      
-      // 現在の組織をクリア
       setCurrentOrganization(null);
       
       addToast('組織を削除しました', 'success');
       
-      // 他の組織があればそちらに切り替え、なければ作成画面へ
       const remainingOrgs = organizations.filter(org => org.id !== currentOrganization.id);
       if (remainingOrgs.length > 0) {
         setCurrentOrganization(remainingOrgs[0]);
@@ -2288,93 +2413,6 @@ const [showNotifications, setShowNotifications] = useState(false);
       addToast('組織の削除に失敗しました: ' + error.message, 'error');
     }
   };
-
-  // 通知を作成する関数
-const createNotification = async (actionType, message) => {
-  if (!user || !currentOrganization) return;
-  
-  try {
-    // 自分以外のメンバーに通知を送る
-    const otherMembers = organizationMembers.filter(m => m.user_id !== user.id);
-    
-    const notificationsToInsert = otherMembers.map(member => ({
-      organization_id: currentOrganization.id,
-      user_id: member.user_id,
-      actor_id: user.id,
-      actor_name: user.user_metadata?.full_name || user.email,
-      actor_email: user.email,
-      action_type: actionType,
-      message: message,
-      is_read: false
-    }));
-    
-    if (notificationsToInsert.length > 0) {
-      const { error } = await supabase
-        .from('notifications')
-        .insert(notificationsToInsert);
-      
-      if (error) console.error('Notification creation error:', error);
-    }
-  } catch (error) {
-    console.error('Failed to create notification:', error);
-  }
-};
-
-// 通知を読み込む関数
-const loadNotifications = async () => {
-  if (!user || !currentOrganization) return;
-  
-  try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('organization_id', currentOrganization.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    
-    if (error) throw error;
-    
-    setNotifications(data || []);
-    setUnreadCount(data?.filter(n => !n.is_read).length || 0);
-  } catch (error) {
-    console.error('Failed to load notifications:', error);
-  }
-};
-
-// 通知を既読にする関数
-const markNotificationAsRead = async (notificationId) => {
-  try {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
-    
-    if (error) throw error;
-    
-    await loadNotifications();
-  } catch (error) {
-    console.error('Failed to mark notification as read:', error);
-  }
-};
-
-// 全ての通知を既読にする関数
-const markAllNotificationsAsRead = async () => {
-  try {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', user.id)
-      .eq('organization_id', currentOrganization.id)
-      .eq('is_read', false);
-    
-    if (error) throw error;
-    
-    await loadNotifications();
-  } catch (error) {
-    console.error('Failed to mark all notifications as read:', error);
-  }
-};
 
   const handleSelectOrganization = (org) => {
     setCurrentOrganization(org);
@@ -2401,6 +2439,14 @@ const markAllNotificationsAsRead = async () => {
         role,
         user.id
       );
+      
+      // 招待通知を作成
+      await createNotification(
+        'member_invited',
+        `${user.user_metadata?.full_name || user.email}が${email}を招待しました`,
+        { email, role }
+      );
+      
       addToast('招待リンクを生成しました', 'success');
       return invitation;
     } catch (error) {
@@ -2412,8 +2458,19 @@ const markAllNotificationsAsRead = async () => {
 
   const handleRemoveMember = async (memberId) => {
     try {
+      // 削除するメンバーの情報を取得
+      const memberToRemove = organizationMembers.find(m => m.id === memberId);
+      
       await removeMember(memberId);
       await loadOrganizationMembers();
+      
+      // 削除通知を作成
+      await createNotification(
+        'member_removed',
+        `${user.user_metadata?.full_name || user.email}が${memberToRemove?.user?.email || 'メンバー'}を削除しました`,
+        { removedMemberEmail: memberToRemove?.user?.email }
+      );
+      
       addToast('メンバーを削除しました', 'info');
     } catch (error) {
       console.error('Failed to remove member:', error);
@@ -2455,6 +2512,7 @@ const markAllNotificationsAsRead = async () => {
     };
     setEmployees(prev => [...prev, newEmployee]);
     setSelectedEmployees(prev => [...prev, newEmployee.id]);
+    setHasUnsavedChanges(true);
     addToast('新しいメンバーを追加しました', 'success');
   };
 
@@ -2464,8 +2522,10 @@ const markAllNotificationsAsRead = async () => {
       return;
     }
     
+    const employeeToRemove = employees.find(emp => emp.id === id);
     setEmployees(prev => prev.filter(emp => emp.id !== id));
     setSelectedEmployees(prev => prev.filter(empId => empId !== id));
+    setHasUnsavedChanges(true);
     addToast('メンバーを削除しました', 'info');
   };
 
@@ -2495,6 +2555,7 @@ const markAllNotificationsAsRead = async () => {
 
   const handleIdealChange = (competency, value) => {
     setIdealProfile(prev => ({ ...prev, [competency]: parseInt(value) }));
+    setHasUnsavedChanges(true);
   };
 
   // チャートデータ準備
@@ -2525,12 +2586,15 @@ const markAllNotificationsAsRead = async () => {
     return data;
   };
 
-  // Supabase連携（組織単位）
+  // Supabase連携(組織単位)
   const saveToSupabase = async (silent = false) => {
     if (!user || !currentOrganization || isReadOnly) return;
     
     setIsSaving(true);
     try {
+      // 更新されたメンバーのリストを作成
+      const updatedMembers = employees.map(emp => emp.name);
+      
       const { data, error } = await supabase
         .from('evaluations')
         .upsert({ 
@@ -2543,7 +2607,8 @@ const markAllNotificationsAsRead = async () => {
           competency_names: competencyNames,
           settings: {
             ...settings,
-            showCriteria
+            showCriteria,
+            uiState  // UI状態を保存
           },
           updated_at: new Date().toISOString() 
         }, {
@@ -2559,7 +2624,16 @@ const markAllNotificationsAsRead = async () => {
       if (!silent) {
         await createNotification(
           'evaluation_updated',
-          `${user.user_metadata?.full_name || user.email}が評価データを更新しました`
+          `${user.user_metadata?.full_name || user.email}が評価データを更新しました`,
+          {
+            memberCount: employees.length,
+            updatedMembers: updatedMembers,
+            timestamp: new Date().toISOString(),
+            changes: {
+              memberCount: employees.length,
+              updatedMembers: updatedMembers
+            }
+          }
         );
         addToast('データを保存しました', 'success');
       }
@@ -2584,24 +2658,28 @@ const markAllNotificationsAsRead = async () => {
       if (error && error.code !== 'PGRST116') throw error;
       
       if (data) {
-        console.log('Loaded evaluation data:', data); // デバッグログ
+        console.log('Loaded evaluation data:', data);
         setEmployees(data.employees || []);
         setIdealProfile(data.ideal_profile || idealProfile);
         setTeamMemo(data.team_memo || '');
         setEvaluationHistory(data.evaluation_history || []);
         if (data.competency_criteria) setCompetencyCriteria(data.competency_criteria);
         if (data.competency_names) setCompetencyNames(data.competency_names);
-        if (data.settings) setSettings(data.settings);
-        if (data.settings.showCriteria !== undefined) {
+        if (data.settings) {
+          setSettings(data.settings);
+          // UI状態の復元
+          if (data.settings.uiState) {
+            setUiState(data.settings.uiState);
+          }
+        }
+        if (data.settings?.showCriteria !== undefined) {
           setShowCriteria(data.settings.showCriteria);
         }
         setLastSaved(new Date(data.updated_at));
         addToast('データを読み込みました', 'success');
       } else {
-        // データが存在しない場合
         console.log('No evaluation data found for this organization');
         
-        // オーナーの場合のみ初期データを作成
         if (currentOrganization.role === 'owner') {
           console.log('Creating initial evaluation data as owner');
           const { error: createError } = await supabase
@@ -2625,7 +2703,7 @@ const markAllNotificationsAsRead = async () => {
                     management: 2, 
                     strategy: 3 
                   }, 
-                  isExpanded: true, 
+                  isExpanded: false, 
                   memo: '' 
                 }
               ],
@@ -2650,7 +2728,20 @@ const markAllNotificationsAsRead = async () => {
                 logoUrl: null, 
                 appName: '評価シート', 
                 autoSave: true, 
-                autoSaveInterval: 1 
+                autoSaveInterval: 1,
+                labels: {
+                  chartTitle: '📊 能力レーダーチャート',
+                  criteriaTitle: '📋 能力評価基準',
+                  teamMemoTitle: '📝 チーム全体のメモ',
+                  memberManagementTitle: 'メンバー管理',
+                  idealProfileTitle: '理想形'
+                },
+                uiState: {
+                  showCriteria: false,
+                  showTeamMemo: false,
+                  showIdealProfile: false,
+                  showMemberList: true,
+                }
               }
             });
           
@@ -2658,11 +2749,9 @@ const markAllNotificationsAsRead = async () => {
             console.error('Failed to create initial evaluation data:', createError);
           } else {
             addToast('初期データを作成しました', 'info');
-            // 作成後に再読み込み
             setTimeout(() => loadFromSupabase(), 500);
           }
         } else {
-          // オーナーでない場合は空データを表示
           addToast('この組織にはまだデータがありません', 'info');
         }
       }
@@ -2704,6 +2793,7 @@ const markAllNotificationsAsRead = async () => {
         if (data.competencyCriteria) setCompetencyCriteria(data.competencyCriteria);
         if (data.competencyNames) setCompetencyNames(data.competencyNames);
         if (data.settings) setSettings(data.settings);
+        setHasUnsavedChanges(true);
         addToast('データをインポートしました', 'success');
       } catch (error) {
         addToast('データの読み込みに失敗しました', 'error');
@@ -2813,7 +2903,6 @@ const markAllNotificationsAsRead = async () => {
     
     setCompetencyCriteria(newCriteria);
     
-    // 能力名も更新
     const updatedNames = {};
     Object.entries(newCriteria).forEach(([key, value]) => {
       updatedNames[key] = value.name;
@@ -2821,13 +2910,21 @@ const markAllNotificationsAsRead = async () => {
     setCompetencyNames(updatedNames);
     
     setHasUnsavedChanges(true);
+    
+    // 評価基準更新の通知を作成
+    createNotification(
+      'criteria_updated',
+      `${user.user_metadata?.full_name || user.email}が評価基準を更新しました`,
+      { criteriaCount: Object.keys(newCriteria).length }
+    );
+    
     addToast('評価基準を更新しました', 'success');
     
-    // 即座に保存
     setTimeout(() => {
       saveToSupabase(false);
     }, 100);
   };
+
   // 認証処理
   const handleSignIn = async () => {
     try {
@@ -2869,6 +2966,7 @@ const markAllNotificationsAsRead = async () => {
         const newIndex = items.findIndex(item => item.id === over.id);
         return arrayMove(items, oldIndex, newIndex);
       });
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -2885,12 +2983,10 @@ const markAllNotificationsAsRead = async () => {
         .then(async (invitation) => {
           console.log('Invitation processed:', invitation);
           
-          // 組織リストを再読み込み
           const orgs = await getUserOrganizations(user.id);
           console.log('Organizations after join:', orgs);
           setOrganizations(orgs);
           
-          // 参加した組織を現在の組織として設定
           const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
           console.log('Target organization:', joinedOrg);
           
@@ -2906,7 +3002,6 @@ const markAllNotificationsAsRead = async () => {
         .catch(error => {
           console.error('Invitation acceptance failed:', error);
           
-          // エラーメッセージを分かりやすく
           let errorMessage = '招待の承認に失敗しました';
           if (error.message.includes('duplicate key')) {
             errorMessage = '既にこの組織のメンバーです';
@@ -2990,7 +3085,7 @@ const markAllNotificationsAsRead = async () => {
     }
   }, [user]);
 
-  // 組織が選択されたらデータと メンバーを読み込み
+  // 組織が選択されたらデータとメンバーを読み込み
   useEffect(() => {
     if (currentOrganization) {
       loadFromSupabase();
@@ -3022,7 +3117,6 @@ const markAllNotificationsAsRead = async () => {
     [teamStats]
   );
 
-  // フィルターされたメンバーリスト
   const filteredEmployees = useMemo(() => filterEmployeesBySearch(employees), [employees, searchQuery]);
 
   // ローディング中
@@ -3067,15 +3161,14 @@ const markAllNotificationsAsRead = async () => {
           }}
         />
         <CreateOrganizationModal
-  open={showCreateOrg}
-  onClose={() => {
-    // 組織が1つ以上ある場合のみ閉じられる
-    if (organizations.length > 0) {
-      setShowCreateOrg(false);
-    }
-  }}
-  onCreate={handleCreateOrganization}
-/>
+          open={showCreateOrg}
+          onClose={() => {
+            if (organizations.length > 0) {
+              setShowCreateOrg(false);
+            }
+          }}
+          onCreate={handleCreateOrganization}
+        />
       </ThemeProvider>
     );
   }
@@ -3165,14 +3258,14 @@ const markAllNotificationsAsRead = async () => {
         currentUserId={user.id}
       />
 
-         {/* 通知モーダル */}
-    <NotificationsModal
-      open={showNotifications}
-      onClose={() => setShowNotifications(false)}
-      notifications={notifications}
-      onMarkAsRead={markNotificationAsRead}
-      onMarkAllAsRead={markAllNotificationsAsRead}
-    />
+      {/* 通知モーダル */}
+      <NotificationsModal
+        open={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        onMarkAsRead={markNotificationAsRead}
+        onMarkAllAsRead={markAllNotificationsAsRead}
+      />
 
       {/* メインレイアウト */}
       <MainLayout 
@@ -3188,10 +3281,10 @@ const markAllNotificationsAsRead = async () => {
         onOpenTeamMembers={() => setShowTeamMembers(true)}
         onSwitchOrganization={() => setShowOrgSelector(true)}
         organizationMembers={organizationMembers}
-        onDeleteOrganization={handleDeleteOrganization} 
-        notifications={notifications}              // ← 追加
-  unreadCount={unreadCount}                 // ← 追加
-  onOpenNotifications={() => setShowNotifications(true)}
+        onDeleteOrganization={handleDeleteOrganization}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onOpenNotifications={() => setShowNotifications(true)}
       >
         <Container maxWidth="xl" disableGutters>
           {/* 閲覧専用警告 */}
@@ -3218,6 +3311,8 @@ const markAllNotificationsAsRead = async () => {
             chartType={chartType}
             onChartTypeChange={setChartType}
             isReadOnly={isReadOnly}
+            settings={settings}
+            onOpenSettings={() => setShowSettings(true)}
           />
 
           {/* プログレスインジケーター */}
@@ -3306,8 +3401,12 @@ const markAllNotificationsAsRead = async () => {
                 {/* チャート */}
                 <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 4 }}>
                   <CardContent sx={{ p: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-                      {chartType === 'radar' ? '📊 能力レーダーチャート' : '📈 能力マトリクス'}
+                    <Typography 
+                      variant="h5" 
+                      sx={{ fontWeight: 600, mb: 3, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+                      onClick={() => setShowSettings(true)}
+                    >
+                      {settings.labels?.chartTitle || '📊 能力レーダーチャート'}
                     </Typography>
                     
                     <Box sx={{ width: '100%', height: 500 }}>
@@ -3436,19 +3535,47 @@ const markAllNotificationsAsRead = async () => {
                   </CardContent>
                 </Card>
 
-                {/* チームメモ */}
-                <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
-                  <CardContent sx={{ p: 3 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 2.5 }}>
-                      📝 チーム全体のメモ
+                {/* チームメモ - 折りたたみ可能 */}
+                <Accordion
+                  expanded={uiState.showTeamMemo}
+                  onChange={() => {
+                    const newState = !uiState.showTeamMemo;
+                    setUiState(prev => ({ ...prev, showTeamMemo: newState }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  elevation={0}
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '12px !important',
+                    '&:before': { display: 'none' },
+                  }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ fontWeight: 600, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSettings(true);
+                      }}
+                    >
+                      {settings.labels?.teamMemoTitle || '📝 チーム全体のメモ'}
                     </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
                     <TextField
                       fullWidth
                       multiline
                       rows={6}
                       placeholder="今期の評価方針、全体的な傾向、次回の見直しポイントなど..."
                       value={teamMemo}
-                      onChange={(e) => !isReadOnly && setTeamMemo(e.target.value)}
+                      onChange={(e) => {
+                        if (!isReadOnly) {
+                          setTeamMemo(e.target.value);
+                          setHasUnsavedChanges(true);
+                        }
+                      }}
                       disabled={isReadOnly}
                       sx={{
                         '& .MuiOutlinedInput-root': {
@@ -3457,8 +3584,8 @@ const markAllNotificationsAsRead = async () => {
                         }
                       }}
                     />
-                  </CardContent>
-                </Card>
+                  </AccordionDetails>
+                </Accordion>
               </Box>
 
               {/* 右側: メンバーカード(スクロール可能) */}
@@ -3478,8 +3605,12 @@ const markAllNotificationsAsRead = async () => {
                 >
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                     <Stack direction="row" spacing={0.5} alignItems="center">
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        メンバー管理
+                      <Typography 
+                        variant="h6" 
+                        sx={{ fontWeight: 600, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+                        onClick={() => setShowSettings(true)}
+                      >
+                        {settings.labels?.memberManagementTitle || 'メンバー管理'}
                       </Typography>
                       <Chip 
                         label={`${filteredEmployees.length}名`} 
@@ -3509,13 +3640,13 @@ const markAllNotificationsAsRead = async () => {
 
                 {/* 能力評価基準(折りたたみ式) */}
                 <Accordion 
-  expanded={showCriteria}
-  onChange={() => {
-    const newState = !showCriteria;
-    setShowCriteria(newState);
-    setHasUnsavedChanges(true);  // この行を追加
-  }}
-  elevation={0}
+                  expanded={uiState.showCriteria}
+                  onChange={() => {
+                    const newState = !uiState.showCriteria;
+                    setUiState(prev => ({ ...prev, showCriteria: newState }));
+                    setHasUnsavedChanges(true);
+                  }}
+                  elevation={0}
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
@@ -3525,8 +3656,16 @@ const markAllNotificationsAsRead = async () => {
                 >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Stack direction="row" alignItems="center" spacing={1} sx={{ width: '100%' }}>
-                      <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>
-                        📋 能力評価基準
+                      <Typography 
+                        variant="subtitle1" 
+                        fontWeight={600} 
+                        sx={{ flex: 1, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowSettings(true);
+                        }}
+                      >
+                        {settings.labels?.criteriaTitle || '📋 能力評価基準'}
                       </Typography>
                       {!isReadOnly && (
                         <IconButton
@@ -3587,55 +3726,66 @@ const markAllNotificationsAsRead = async () => {
                   </AccordionDetails>
                 </Accordion>
 
-                {/* 理想形カード */}
+                {/* 理想形カード - 折りたたみ可能 */}
                 {showIdeal && (
-                  <Card 
+                  <Accordion
+                    expanded={uiState.showIdealProfile}
+                    onChange={() => {
+                      const newState = !uiState.showIdealProfile;
+                      setUiState(prev => ({ ...prev, showIdealProfile: newState }));
+                      setHasUnsavedChanges(true);
+                    }}
                     elevation={0}
                     sx={{ 
                       border: '2px dashed',
                       borderColor: '#cbd5e1',
-                      bgcolor: '#f8fafc'
+                      bgcolor: '#f8fafc',
+                      borderRadius: '12px !important',
+                      '&:before': { display: 'none' },
                     }}
                   >
-                    <CardContent sx={{ p: 2.5 }}>
-                      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => setIdealProfile(prev => ({ ...prev, isExpanded: !prev.isExpanded }))}
-                        >
-                          {idealProfile.isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                        </IconButton>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: '100%' }}>
                         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#94a3b8' }} />
-                        <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1 }}>理想形</Typography>
+                        <Typography 
+                          variant="subtitle1" 
+                          fontWeight={600} 
+                          sx={{ flex: 1, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowSettings(true);
+                          }}
+                        >
+                          {settings.labels?.idealProfileTitle || '理想形'}
+                        </Typography>
                         <Chip 
                           label={calculateAverage(idealProfile)} 
                           size="small" 
                           sx={{ fontWeight: 700, bgcolor: '#e2e8f0' }}
                         />
                       </Stack>
-
-                      <Collapse in={idealProfile.isExpanded}>
-                        <Grid container spacing={1.5}>
-                          {Object.entries(competencyNames).map(([key, name]) => (
-                            <Grid item xs={6} key={key}>
-                              <FormControl fullWidth size="small" disabled={isReadOnly}>
-                                <InputLabel>{name}</InputLabel>
-                                <Select
-                                  value={idealProfile[key]}
-                                  label={name}
-                                  onChange={(e) => !isReadOnly && handleIdealChange(key, e.target.value)}
-                                >
-                                  {[1, 2, 3, 4, 5].map(level => (
-                                    <MenuItem key={level} value={level}>Lv.{level}</MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Collapse>
-                    </CardContent>
-                  </Card>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Grid container spacing={1.5}>
+                        {Object.entries(competencyNames).map(([key, name]) => (
+                          <Grid item xs={6} key={key}>
+                            <FormControl fullWidth size="small" disabled={isReadOnly}>
+                              <InputLabel>{name}</InputLabel>
+                              <Select
+                                value={idealProfile[key]}
+                                label={name}
+                                onChange={(e) => !isReadOnly && handleIdealChange(key, e.target.value)}
+                              >
+                                {[1, 2, 3, 4, 5].map(level => (
+                                  <MenuItem key={level} value={level}>Lv.{level}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </AccordionDetails>
+                  </Accordion>
                 )}
 
                 {/* 検索結果の表示 */}
@@ -3696,8 +3846,9 @@ const markAllNotificationsAsRead = async () => {
                                   size="small"
                                   color="error"
                                   onClick={() => {
-                                    if (window.confirm('この履歴を削除しますか？')) {
+                                    if (window.confirm('この履歴を削除しますか?')) {
                                       setEvaluationHistory(prev => prev.filter(h => h.id !== history.id));
+                                      setHasUnsavedChanges(true);
                                       addToast('履歴を削除しました', 'info');
                                     }
                                   }}
