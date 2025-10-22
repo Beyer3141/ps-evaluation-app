@@ -173,19 +173,20 @@ const createOrganization = async (name, userId) => {
     console.log('Organization created:', org);
     
     // 2. オーナーとして自動追加
-    const { error: memberError } = await supabase
-      .from('organization_members')
-      .insert({
-        organization_id: org.id,
-        user_id: userId,
-        role: 'owner',
-        joined_at: new Date().toISOString()
-      });
-    
-    if (memberError) {
-      console.error('Member creation error:', memberError);
-      throw memberError;
-    }
+// 現在のユーザー情報を取得
+const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+const { error: memberError } = await supabase
+  .from('organization_members')
+  .insert({
+    organization_id: org.id,
+    user_id: userId,
+    role: 'owner',
+    joined_at: new Date().toISOString(),
+    user_email: currentUser.email,
+    user_name: currentUser.user_metadata?.full_name || null,
+    user_avatar_url: currentUser.user_metadata?.avatar_url || null
+  });
     
     console.log('Owner added successfully');
     
@@ -275,30 +276,21 @@ const getUserOrganizations = async (userId) => {
 const getOrganizationMembers = async (orgId) => {
   const { data, error } = await supabase
     .from('organization_members')
-    .select(`
-      id,
-      user_id,
-      role,
-      joined_at
-    `)
+    .select('*')  // 全カラムを取得
     .eq('organization_id', orgId);
   
   if (error) throw error;
   
-  // ユーザー情報を取得
-  const userIds = data.map(m => m.user_id);
-  const users = {};
-  
-  for (const uid of userIds) {
-    const { data: userData } = await supabase.auth.admin.getUserById(uid);
-    if (userData) {
-      users[uid] = userData.user;
-    }
-  }
-  
+  // user情報を整形
   return data.map(member => ({
     ...member,
-    user: users[member.user_id]
+    user: {
+      email: member.user_email,
+      user_metadata: {
+        full_name: member.user_name,
+        avatar_url: member.user_avatar_url
+      }
+    }
   }));
 };
 
@@ -345,16 +337,21 @@ const acceptInvitation = async (token, userId) => {
   }
   
   // メンバーとして追加
-  const { error: memberError } = await supabase
-    .from('organization_members')
-    .insert({
-      organization_id: invitation.organization_id,
-      user_id: userId,
-      role: invitation.role,
-      invited_by: invitation.invited_by,
-      joined_at: new Date().toISOString()
-    });
-  
+// 現在のユーザー情報を取得
+const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+const { error: memberError } = await supabase
+  .from('organization_members')
+  .insert({
+    organization_id: invitation.organization_id,
+    user_id: userId,
+    role: invitation.role,
+    invited_by: invitation.invited_by,
+    joined_at: new Date().toISOString(),
+    user_email: currentUser.email,
+    user_name: currentUser.user_metadata?.full_name || null,
+    user_avatar_url: currentUser.user_metadata?.avatar_url || null
+  });
   if (memberError) throw memberError;
   
   // 招待を使用済みに
