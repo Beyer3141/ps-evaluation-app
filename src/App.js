@@ -155,43 +155,103 @@ const getCurrentUser = async () => {
 
 // 組織管理関数
 const createOrganization = async (name, userId) => {
-  const { data: org, error: orgError } = await supabase
-    .from('organizations')
-    .insert({ name, created_by: userId })
-    .select()
-    .single();
-  
-  if (orgError) throw orgError;
-  
-  // オーナーとして自動追加
-  const { error: memberError } = await supabase
-    .from('organization_members')
-    .insert({
-      organization_id: org.id,
-      user_id: userId,
-      role: 'owner',
-      joined_at: new Date().toISOString()
-    });
-  
-  if (memberError) throw memberError;
-  
-  // 初期評価データを作成
-  const { error: evalError } = await supabase
-    .from('evaluations')
-    .insert({
-      organization_id: org.id,
-      employees: [{ id: 1, name: 'メンバーA', color: '#3b82f6', scores: { dataAnalysis: 3, problemSolving: 4, techKnowledge: 3, learnSpeed: 4, creativity: 3, planning: 3, communication: 4, support: 3, management: 2, strategy: 3 }, isExpanded: true, memo: '' }],
-      ideal_profile: { dataAnalysis: 5, problemSolving: 5, techKnowledge: 5, learnSpeed: 5, creativity: 5, planning: 5, communication: 5, support: 5, management: 5, strategy: 5, isExpanded: false },
-      team_memo: '',
-      evaluation_history: [],
-      competency_criteria: null,
-      competency_names: null,
-      settings: { logoUrl: null, appName: 'PS能力評価チャート', autoSave: true, autoSaveInterval: 1 }
-    });
-  
-  if (evalError) throw evalError;
-  
-  return org;
+  try {
+    console.log('Creating organization:', name, userId);
+    
+    // 1. 組織を作成
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
+      .insert({ name, created_by: userId })
+      .select()
+      .single();
+    
+    if (orgError) {
+      console.error('Organization creation error:', orgError);
+      throw orgError;
+    }
+    
+    console.log('Organization created:', org);
+    
+    // 2. オーナーとして自動追加
+    const { error: memberError } = await supabase
+      .from('organization_members')
+      .insert({
+        organization_id: org.id,
+        user_id: userId,
+        role: 'owner',
+        joined_at: new Date().toISOString()
+      });
+    
+    if (memberError) {
+      console.error('Member creation error:', memberError);
+      throw memberError;
+    }
+    
+    console.log('Owner added successfully');
+    
+    // 3. 初期評価データを作成
+    const { error: evalError } = await supabase
+      .from('evaluations')
+      .insert({
+        organization_id: org.id,
+        employees: [
+          { 
+            id: 1, 
+            name: 'メンバーA', 
+            color: '#3b82f6', 
+            scores: { 
+              dataAnalysis: 3, 
+              problemSolving: 4, 
+              techKnowledge: 3, 
+              learnSpeed: 4, 
+              creativity: 3, 
+              planning: 3, 
+              communication: 4, 
+              support: 3, 
+              management: 2, 
+              strategy: 3 
+            }, 
+            isExpanded: true, 
+            memo: '' 
+          }
+        ],
+        ideal_profile: { 
+          dataAnalysis: 5, 
+          problemSolving: 5, 
+          techKnowledge: 5, 
+          learnSpeed: 5, 
+          creativity: 5, 
+          planning: 5, 
+          communication: 5, 
+          support: 5, 
+          management: 5, 
+          strategy: 5, 
+          isExpanded: false 
+        },
+        team_memo: '',
+        evaluation_history: [],
+        competency_criteria: null,
+        competency_names: null,
+        settings: { 
+          logoUrl: null, 
+          appName: '評価シート', 
+          autoSave: true, 
+          autoSaveInterval: 1 
+        }
+      });
+    
+    if (evalError) {
+      console.error('Evaluation creation error:', evalError);
+      throw evalError;
+    }
+    
+    console.log('Evaluation data created successfully');
+    
+    return org;
+  } catch (error) {
+    console.error('Failed to create organization:', error);
+    throw error;
+  }
 };
 
 const getUserOrganizations = async (userId) => {
@@ -2016,14 +2076,24 @@ function App() {
 
   const handleCreateOrganization = async (name) => {
     try {
+      console.log('handleCreateOrganization called with:', name);
       const org = await createOrganization(name, user.id);
+      console.log('Organization created, adding to state:', org);
+      
+      // 組織リストに追加
       setOrganizations(prev => [...prev, { ...org, role: 'owner' }]);
+      
+      // 現在の組織として設定
       setCurrentOrganization({ ...org, role: 'owner' });
+      
       addToast('組織を作成しました', 'success');
       setShowCreateOrg(false);
+      
+      // データを読み込む
+      await loadFromSupabase();
     } catch (error) {
       console.error('Failed to create organization:', error);
-      addToast('組織の作成に失敗しました', 'error');
+      addToast('組織の作成に失敗しました: ' + error.message, 'error');
     }
   };
 
