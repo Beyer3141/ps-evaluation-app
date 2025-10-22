@@ -543,6 +543,90 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
     }
   };
 
+  function NotificationsModal({ open, onClose, notifications, onMarkAsRead, onMarkAllAsRead }) {
+    const getActionIcon = (actionType) => {
+      switch (actionType) {
+        case 'evaluation_updated':
+          return <EditIcon fontSize="small" color="primary" />;
+        case 'member_added':
+          return <PersonAddIcon fontSize="small" color="success" />;
+        case 'member_removed':
+          return <DeleteIcon fontSize="small" color="error" />;
+        default:
+          return <InfoIcon fontSize="small" />;
+      }
+    };
+  
+    return (
+      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <NotificationsIcon color="primary" />
+              <Typography variant="h6">通知</Typography>
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              {notifications.some(n => !n.is_read) && (
+                <Button size="small" onClick={onMarkAllAsRead}>
+                  全て既読
+                </Button>
+              )}
+              <IconButton onClick={onClose} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Stack>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers>
+          {notifications.length === 0 ? (
+            <Alert severity="info">通知はありません</Alert>
+          ) : (
+            <List>
+              {notifications.map((notification) => (
+                <ListItem
+                  key={notification.id}
+                  sx={{
+                    bgcolor: notification.is_read ? 'transparent' : 'action.hover',
+                    borderRadius: 1,
+                    mb: 1,
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.selected' }
+                  }}
+                  onClick={() => {
+                    if (!notification.is_read) {
+                      onMarkAsRead(notification.id);
+                    }
+                  }}
+                >
+                  <ListItemIcon>
+                    {getActionIcon(notification.action_type)}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="body2" fontWeight={notification.is_read ? 400 : 600}>
+                          {notification.message}
+                        </Typography>
+                        {!notification.is_read && (
+                          <Chip label="未読" size="small" color="primary" sx={{ height: 18 }} />
+                        )}
+                      </Stack>
+                    }
+                    secondary={
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(notification.created_at).toLocaleString('ja-JP')}
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const copyInviteLink = () => {
     navigator.clipboard.writeText(inviteLink);
     alert('リンクをコピーしました！');
@@ -1326,13 +1410,22 @@ function ActionBar({
           }}
         >
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 500, mb: 0.5 }}>
-              PS能力評価チャート
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              10の能力を5段階で評価し、視覚的に強み・弱みを把握する
-            </Typography>
-          </Box>
+  <Typography 
+    variant="h5" 
+    onClick={onOpenSettings}  // クリックで設定を開く
+    sx={{ 
+      fontWeight: 500, 
+      mb: 0.5,
+      cursor: 'pointer',
+      '&:hover': { color: 'primary.main' }
+    }}
+  >
+    {settings.appName || '評価チャート'}
+  </Typography>
+  <Typography variant="body2" color="text.secondary">
+    10の能力を5段階で評価し、視覚的に強み・弱みを把握する
+  </Typography>
+</Box>
 
           {/* ステータス */}
           <Stack direction="row" spacing={1} alignItems="center">
@@ -1515,6 +1608,9 @@ function MainLayout({
   onSwitchOrganization,
   organizationMembers,
   onDeleteOrganization,
+  notifications,           // 追加
+  unreadCount,            // 追加
+  onOpenNotifications, 
 }) {
   const muiTheme = useMuiTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
@@ -1565,20 +1661,22 @@ function MainLayout({
     >
       {/* ロゴ */}
       <Box sx={{ px: 2, mb: 3, display: 'flex', justifyContent: 'center' }}>
-        <Avatar 
-          src={settings.logoUrl}
-          sx={{ 
-            width: 48,
-            height: 48,
-            background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            fontSize: '1.25rem',
-            fontWeight: 700,
-          }}
-        >
-          {!settings.logoUrl && 'PS'}
-        </Avatar>
-      </Box>
-
+  <Avatar 
+    src={settings.logoUrl}
+    onClick={onOpenSettings}  // クリックで設定を開く
+    sx={{ 
+      width: 48,
+      height: 48,
+      background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      fontSize: '1.25rem',
+      fontWeight: 700,
+      cursor: 'pointer',
+      '&:hover': { opacity: 0.8 }
+    }}
+  >
+    {!settings.logoUrl && (settings.appName?.[0] || 'PS')}
+  </Avatar>
+</Box>
       <Divider sx={{ mb: 2 }} />
 
       {/* ナビゲーションメニュー - アイコンのみ */}
@@ -1762,11 +1860,16 @@ function MainLayout({
               </IconButton>
             </MuiTooltip>
 
-            <IconButton color="inherit">
-              <Badge badgeContent={3} color="error">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
+            <IconButton color="inherit" onClick={onOpenNotifications}>
+  <Badge badgeContent={unreadCount} color="error">
+    <NotificationsIcon />
+  </Badge>
+</IconButton>
+            <IconButton color="inherit" onClick={onOpenNotifications}>
+  <Badge badgeContent={unreadCount} color="error">
+    <NotificationsIcon />
+  </Badge>
+</IconButton>
             <IconButton color="inherit" onClick={handleMenuOpen}>
               <Avatar 
                 src={user?.user_metadata?.avatar_url}
@@ -1923,7 +2026,7 @@ function App() {
   const [newEvaluationDate, setNewEvaluationDate] = useState(new Date().toISOString().split('T')[0]);
   const [newEvaluationMemo, setNewEvaluationMemo] = useState('');
   const [teamMemo, setTeamMemo] = useState('');
-  const [showCriteria, setShowCriteria] = useState(true);
+  const [showCriteria, setShowCriteria] = useState(false);
   const [expandedCriteria, setExpandedCriteria] = useState({});
   const [toasts, setToasts] = useState([]);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
@@ -1934,6 +2037,9 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCriteriaSettings, setShowCriteriaSettings] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+const [unreadCount, setUnreadCount] = useState(0);
+const [showNotifications, setShowNotifications] = useState(false);
   
   const chartRef = useRef(null);
   const nextId = useRef(2);
@@ -2183,6 +2289,93 @@ function App() {
     }
   };
 
+  // 通知を作成する関数
+const createNotification = async (actionType, message) => {
+  if (!user || !currentOrganization) return;
+  
+  try {
+    // 自分以外のメンバーに通知を送る
+    const otherMembers = organizationMembers.filter(m => m.user_id !== user.id);
+    
+    const notificationsToInsert = otherMembers.map(member => ({
+      organization_id: currentOrganization.id,
+      user_id: member.user_id,
+      actor_id: user.id,
+      actor_name: user.user_metadata?.full_name || user.email,
+      actor_email: user.email,
+      action_type: actionType,
+      message: message,
+      is_read: false
+    }));
+    
+    if (notificationsToInsert.length > 0) {
+      const { error } = await supabase
+        .from('notifications')
+        .insert(notificationsToInsert);
+      
+      if (error) console.error('Notification creation error:', error);
+    }
+  } catch (error) {
+    console.error('Failed to create notification:', error);
+  }
+};
+
+// 通知を読み込む関数
+const loadNotifications = async () => {
+  if (!user || !currentOrganization) return;
+  
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('organization_id', currentOrganization.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    
+    if (error) throw error;
+    
+    setNotifications(data || []);
+    setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+  } catch (error) {
+    console.error('Failed to load notifications:', error);
+  }
+};
+
+// 通知を既読にする関数
+const markNotificationAsRead = async (notificationId) => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+    
+    if (error) throw error;
+    
+    await loadNotifications();
+  } catch (error) {
+    console.error('Failed to mark notification as read:', error);
+  }
+};
+
+// 全ての通知を既読にする関数
+const markAllNotificationsAsRead = async () => {
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user.id)
+      .eq('organization_id', currentOrganization.id)
+      .eq('is_read', false);
+    
+    if (error) throw error;
+    
+    await loadNotifications();
+  } catch (error) {
+    console.error('Failed to mark all notifications as read:', error);
+  }
+};
+
   const handleSelectOrganization = (org) => {
     setCurrentOrganization(org);
     setShowOrgSelector(false);
@@ -2348,17 +2541,28 @@ function App() {
           evaluation_history: evaluationHistory,
           competency_criteria: competencyCriteria,
           competency_names: competencyNames,
-          settings,
+          settings: {
+            ...settings,
+            showCriteria
+          },
           updated_at: new Date().toISOString() 
-        },{
-          onConflict: 'organization_id'  // ← これを追加
+        }, {
+          onConflict: 'organization_id'
         });
       
       if (error) throw error;
       
       setHasUnsavedChanges(false);
       setLastSaved(new Date());
-      if (!silent) addToast('データを保存しました', 'success');
+      
+      // 通知を作成
+      if (!silent) {
+        await createNotification(
+          'evaluation_updated',
+          `${user.user_metadata?.full_name || user.email}が評価データを更新しました`
+        );
+        addToast('データを保存しました', 'success');
+      }
     } catch (error) {
       console.error('保存エラー:', error);
       addToast('保存に失敗しました', 'error');
@@ -2388,6 +2592,9 @@ function App() {
         if (data.competency_criteria) setCompetencyCriteria(data.competency_criteria);
         if (data.competency_names) setCompetencyNames(data.competency_names);
         if (data.settings) setSettings(data.settings);
+        if (data.settings.showCriteria !== undefined) {
+          setShowCriteria(data.settings.showCriteria);
+        }
         setLastSaved(new Date(data.updated_at));
         addToast('データを読み込みました', 'success');
       } else {
@@ -2788,6 +2995,7 @@ function App() {
     if (currentOrganization) {
       loadFromSupabase();
       loadOrganizationMembers();
+      loadNotifications();
     }
   }, [currentOrganization]);
 
@@ -2957,6 +3165,15 @@ function App() {
         currentUserId={user.id}
       />
 
+         {/* 通知モーダル */}
+    <NotificationsModal
+      open={showNotifications}
+      onClose={() => setShowNotifications(false)}
+      notifications={notifications}
+      onMarkAsRead={markNotificationAsRead}
+      onMarkAllAsRead={markAllNotificationsAsRead}
+    />
+
       {/* メインレイアウト */}
       <MainLayout 
         viewMode={viewMode} 
@@ -2972,6 +3189,9 @@ function App() {
         onSwitchOrganization={() => setShowOrgSelector(true)}
         organizationMembers={organizationMembers}
         onDeleteOrganization={handleDeleteOrganization} 
+        notifications={notifications}              // ← 追加
+  unreadCount={unreadCount}                 // ← 追加
+  onOpenNotifications={() => setShowNotifications(true)}
       >
         <Container maxWidth="xl" disableGutters>
           {/* 閲覧専用警告 */}
@@ -3289,9 +3509,13 @@ function App() {
 
                 {/* 能力評価基準(折りたたみ式) */}
                 <Accordion 
-                  expanded={showCriteria}
-                  onChange={() => setShowCriteria(!showCriteria)}
-                  elevation={0}
+  expanded={showCriteria}
+  onChange={() => {
+    const newState = !showCriteria;
+    setShowCriteria(newState);
+    setHasUnsavedChanges(true);  // この行を追加
+  }}
+  elevation={0}
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
