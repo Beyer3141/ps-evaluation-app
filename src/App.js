@@ -117,7 +117,7 @@ import {
   AdminPanelSettings as AdminIcon,
   RemoveRedEye as ViewerIcon,
   SwapHoriz as SwitchIcon,
-} from '@mui/icons-material';
+} from '@mui/material';
 
 import { theme } from './theme';
 
@@ -415,6 +415,7 @@ function OrganizationSelectorModal({ open, onClose, organizations, onSelect, onC
                 },
                 border: '1px solid',
                 borderColor: 'divider',
+                borderRadius: 2,
               }}
               onClick={() => onSelect(org)}
             >
@@ -648,7 +649,7 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
       <DialogContent dividers>
         <Stack spacing={3}>
           {canManageMembers && (
-            <Card variant="outlined">
+            <Card variant="outlined" sx={{ borderRadius: 2 }}>
               <CardContent>
                 <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                   メンバーを招待
@@ -716,7 +717,7 @@ function TeamMembersModal({ open, onClose, organization, members, onInvite, onRe
             </Card>
           )}
 
-          <Card variant="outlined">
+          <Card variant="outlined" sx={{ borderRadius: 2 }}>
             <CardContent>
               <Typography variant="subtitle2" fontWeight={600} gutterBottom>
                 権限について
@@ -845,10 +846,10 @@ function LoginScreen({ onSignIn }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #4DB8AC 0%, #2C4A6E 100%)',
       }}
     >
-      <Card sx={{ maxWidth: 400, width: '90%', p: 4 }}>
+      <Card sx={{ maxWidth: 400, width: '90%', p: 4, borderRadius: 2 }}>
         <CardContent>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Avatar
@@ -856,9 +857,10 @@ function LoginScreen({ onSignIn }) {
                 width: 80,
                 height: 80,
                 margin: '0 auto 16px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)',
                 fontSize: '2rem',
                 fontWeight: 700,
+                borderRadius: 2,
               }}
             >
               PS
@@ -880,10 +882,6 @@ function LoginScreen({ onSignIn }) {
             startIcon={loading ? <CircularProgress size={20} /> : null}
             sx={{
               py: 1.5,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
-              },
             }}
           >
             {loading ? 'ログイン中...' : 'Googleでログイン'}
@@ -934,7 +932,7 @@ function KeyboardShortcutsModal({ isOpen, onClose }) {
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: 2,
         }
       }}
     >
@@ -967,7 +965,7 @@ function KeyboardShortcutsModal({ isOpen, onClose }) {
                 label={shortcut.key}
                 size="small"
                 variant="outlined"
-                sx={{ fontFamily: 'monospace', fontWeight: 600 }}
+                sx={{ fontFamily: 'monospace', fontWeight: 600, borderRadius: 1 }}
               />
             </ListItem>
           ))}
@@ -1029,7 +1027,7 @@ function CriteriaSettingsModal({ open, onClose, criteria, onSave }) {
       <DialogContent dividers>
         <Stack spacing={3}>
           {Object.entries(editedCriteria).map(([key, competency]) => (
-            <Card key={key} variant="outlined">
+            <Card key={key} variant="outlined" sx={{ borderRadius: 2 }}>
               <CardContent>
                 <TextField
                   fullWidth
@@ -1127,9 +1125,10 @@ function SettingsModal({ open, onClose, settings, onSave }) {
                 sx={{
                   width: 80,
                   height: 80,
-                  background: logoPreview ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  background: logoPreview ? 'transparent' : 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)',
                   fontSize: '1.5rem',
                   fontWeight: 700,
+                  borderRadius: 2,
                 }}
               >
                 {!logoPreview && 'PS'}
@@ -1296,6 +1295,7 @@ function SortableEmployeeCard({
         border: '1px solid',
         borderColor: 'divider',
         transition: 'all 0.2s',
+        borderRadius: 2,
         '&:hover': {
           boxShadow: 3,
           borderColor: 'primary.light',
@@ -1350,7 +1350,7 @@ function SortableEmployeeCard({
             size="small" 
             sx={{ 
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)',
               color: 'white',
               minWidth: 42,
             }}
@@ -1377,13 +1377,13 @@ function SortableEmployeeCard({
             label={`💪 ${strengths[0]?.name}`}
             size="small"
             variant="outlined"
-            sx={{ fontSize: '0.7rem', height: 24, borderColor: '#10b981', color: '#059669' }}
+            sx={{ fontSize: '0.7rem', height: 24, borderColor: '#2D9B8F', color: '#1F7A71', borderRadius: 1 }}
           />
           <Chip 
             label={`📈 ${weaknesses[0]?.name}`}
             size="small"
             variant="outlined"
-            sx={{ fontSize: '0.7rem', height: 24, borderColor: '#f59e0b', color: '#d97706' }}
+            sx={{ fontSize: '0.7rem', height: 24, borderColor: '#F5A623', color: '#E09200', borderRadius: 1 }}
           />
         </Stack>
 
@@ -1426,7 +1426,6 @@ function SortableEmployeeCard({
 }
 
 // ActionBar コンポーネント
-// ActionBar コンポーネント
 function ActionBar({
   isSaving,
   isOnline,
@@ -1445,7 +1444,6 @@ function ActionBar({
   isReadOnly,
   settings,
   onOpenSettings,
-  // 履歴保存用の新しいprops
   onSaveHistory,
   evaluationDate,
   onEvaluationDateChange,
@@ -1459,8 +1457,8 @@ function ActionBar({
       elevation={0}
       sx={{
         mb: 3,
-        p: 2,
-        borderRadius: 2,
+        p: 1.5,
+        borderRadius: 1.5,
         border: '1px solid',
         borderColor: 'divider',
       }}
@@ -1548,7 +1546,7 @@ function ActionBar({
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={onAddMember}
-                  sx={{ borderRadius: 2 }}
+                  sx={{ borderRadius: 1.5 }}
                 >
                   メンバー追加
                 </Button>
@@ -1559,7 +1557,7 @@ function ActionBar({
                   startIcon={<SaveIcon />}
                   onClick={onSave}
                   disabled={isSaving}
-                  sx={{ borderRadius: 2 }}
+                  sx={{ borderRadius: 1.5 }}
                 >
                   {isSaving ? '保存中...' : '保存'}
                 </Button>
@@ -1572,7 +1570,7 @@ function ActionBar({
               variant="outlined"
               startIcon={<DownloadIcon />}
               onClick={onExportJSON}
-              sx={{ borderRadius: 2 }}
+              sx={{ borderRadius: 1.5 }}
             >
               JSON
             </Button>
@@ -1581,7 +1579,7 @@ function ActionBar({
               variant="outlined"
               startIcon={<ImageIcon />}
               onClick={onExportSVG}
-              sx={{ borderRadius: 2 }}
+              sx={{ borderRadius: 1.5 }}
             >
               SVG
             </Button>
@@ -1592,7 +1590,7 @@ function ActionBar({
                   variant="outlined"
                   component="label"
                   startIcon={<UploadIcon />}
-                  sx={{ borderRadius: 2 }}
+                  sx={{ borderRadius: 1.5 }}
                 >
                   インポート
                   <input type="file" accept=".json" onChange={onImport} hidden />
@@ -1605,7 +1603,7 @@ function ActionBar({
                   variant="outlined"
                   startIcon={<CalendarIcon />}
                   onClick={() => setShowHistorySave(!showHistorySave)}
-                  sx={{ borderRadius: 2 }}
+                  sx={{ borderRadius: 1.5 }}
                   color={showHistorySave ? 'primary' : 'inherit'}
                 >
                   履歴保存
@@ -1630,7 +1628,7 @@ function ActionBar({
               color={showIdeal ? 'primary' : 'default'}
               variant={showIdeal ? 'filled' : 'outlined'}
               size="small"
-              sx={{ cursor: 'pointer' }}
+              sx={{ cursor: 'pointer', borderRadius: 1 }}
             />
 
             <Box
@@ -1639,7 +1637,7 @@ function ActionBar({
                 gap: 0.5,
                 p: 0.5,
                 bgcolor: 'action.hover',
-                borderRadius: 2,
+                borderRadius: 1,
               }}
             >
               <Button
@@ -1648,7 +1646,7 @@ function ActionBar({
                 onClick={() => onChartTypeChange('radar')}
                 sx={{
                   minWidth: 80,
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   py: 0.5,
                 }}
               >
@@ -1660,7 +1658,7 @@ function ActionBar({
                 onClick={() => onChartTypeChange('scatter')}
                 sx={{
                   minWidth: 80,
-                  borderRadius: 1.5,
+                  borderRadius: 1,
                   py: 0.5,
                 }}
               >
@@ -1670,11 +1668,11 @@ function ActionBar({
           </Stack>
         </Box>
 
-        {/* 履歴保存フォーム（展開時） */}
+        {/* 履歴保存フォーム(展開時) */}
         {!isReadOnly && (
           <Collapse in={showHistorySave}>
             <Divider sx={{ my: 1 }} />
-            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 2 }}>
+            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1.5 }}>
               <Stack direction="row" spacing={2} alignItems="center">
                 <TextField
                   label="評価日"
@@ -1698,12 +1696,6 @@ function ActionBar({
                   onClick={() => {
                     onSaveHistory();
                     setShowHistorySave(false);
-                  }}
-                  sx={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
-                    }
                   }}
                 >
                   履歴に保存
@@ -1790,10 +1782,11 @@ function MainLayout({
           sx={{ 
             width: 48,
             height: 48,
-            background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: settings.logoUrl ? 'transparent' : 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)',
             fontSize: '1.25rem',
             fontWeight: 700,
             cursor: 'pointer',
+            borderRadius: 2,
             '&:hover': { opacity: 0.8 }
           }}
         >
@@ -1813,12 +1806,12 @@ function MainLayout({
               sx={{
                 width: '100%',
                 height: 56,
-                borderRadius: 3,
+                borderRadius: 2,
                 mb: 1,
                 color: viewMode === item.id ? 'primary.main' : 'text.secondary',
-                bgcolor: viewMode === item.id ? 'primary.50' : 'transparent',
+                bgcolor: viewMode === item.id ? '#E8F6F4' : 'transparent',
                 '&:hover': {
-                  bgcolor: viewMode === item.id ? 'primary.100' : 'action.hover',
+                  bgcolor: viewMode === item.id ? '#D4E8E5' : 'action.hover',
                 },
                 transition: 'all 0.2s',
                 '& .MuiSvgIcon-root': {
@@ -1841,7 +1834,7 @@ function MainLayout({
             sx={{
               width: '100%',
               height: 56,
-              borderRadius: 3,
+              borderRadius: 2,
               color: 'text.secondary',
               '& .MuiSvgIcon-root': {
                 fontSize: '1.75rem',
@@ -1862,7 +1855,7 @@ function MainLayout({
             sx={{
               width: '100%',
               height: 56,
-              borderRadius: 3,
+              borderRadius: 2,
               color: 'text.secondary',
               '& .MuiSvgIcon-root': {
                 fontSize: '1.75rem',
@@ -1917,7 +1910,7 @@ function MainLayout({
           <Box
             sx={{
               position: 'relative',
-              borderRadius: 2,
+              borderRadius: 1.5,
               bgcolor: 'action.hover',
               '&:hover': {
                 bgcolor: 'action.selected',
@@ -2147,7 +2140,7 @@ function App() {
   const chartRef = useRef(null);
   const nextId = useRef(2);
 
-  // UI状態の管理（折りたたみ状態）
+  // UI状態の管理(折りたたみ状態)
   const [uiState, setUiState] = useState({
     showCriteria: false,
     showTeamMemo: false,
@@ -2974,11 +2967,11 @@ function App() {
     setHasUnsavedChanges(true);
     addToast('設定を保存しました', 'success');
 
-      // 即座にSupabaseに保存
-  setTimeout(async () => {
-    await saveToSupabase(false);
-    addToast('設定がSupabaseに反映されました', 'success');
-  }, 100);
+    // 即座にSupabaseに保存
+    setTimeout(async () => {
+      await saveToSupabase(false);
+      addToast('設定がSupabaseに反映されました', 'success');
+    }, 100);
   };
 
   // 評価基準保存ハンドラー
@@ -3057,71 +3050,71 @@ function App() {
     }
   };
 
-// 招待URLの処理
-useEffect(() => {
-  const path = window.location.pathname;
-  const match = path.match(/\/invite\/(.+)/);
-  
-  if (match && user) {
-    const token = match[1];
-    console.log('Processing invitation token:', token);
+  // 招待URLの処理
+  useEffect(() => {
+    const path = window.location.pathname;
+    const match = path.match(/\/invite\/(.+)/);
     
-    acceptInvitation(token, user.id)
-      .then(async (invitation) => {
-        console.log('Invitation processed:', invitation);
-        
-        // 組織リストを再読み込み
-        const orgs = await getUserOrganizations(user.id);
-        console.log('Organizations after join:', orgs);
-        setOrganizations(orgs);
-        
-        // 対象の組織を見つける
-        const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
-        console.log('Target organization:', joinedOrg);
-        
-        if (joinedOrg) {
-          // 組織を切り替え
-          setCurrentOrganization(joinedOrg);
+    if (match && user) {
+      const token = match[1];
+      console.log('Processing invitation token:', token);
+      
+      acceptInvitation(token, user.id)
+        .then(async (invitation) => {
+          console.log('Invitation processed:', invitation);
           
-          // メッセージを表示
-          if (invitation.isExistingMember) {
-            addToast(`${joinedOrg.name}に切り替えました（既にメンバーです）`, 'info');
+          // 組織リストを再読み込み
+          const orgs = await getUserOrganizations(user.id);
+          console.log('Organizations after join:', orgs);
+          setOrganizations(orgs);
+          
+          // 対象の組織を見つける
+          const joinedOrg = orgs.find(org => org.id === invitation.organization_id);
+          console.log('Target organization:', joinedOrg);
+          
+          if (joinedOrg) {
+            // 組織を切り替え
+            setCurrentOrganization(joinedOrg);
+            
+            // メッセージを表示
+            if (invitation.isExistingMember) {
+              addToast(`${joinedOrg.name}に切り替えました(既にメンバーです)`, 'info');
+            } else {
+              addToast(`${joinedOrg.name}に参加しました`, 'success');
+            }
+            
+            // データを読み込み
+            setTimeout(() => {
+              loadFromSupabase();
+              loadOrganizationMembers();
+              loadNotifications();
+            }, 500);
           } else {
-            addToast(`${joinedOrg.name}に参加しました`, 'success');
+            console.error('Organization not found in user organizations');
+            addToast('組織への参加に成功しましたが、組織情報の読み込みに失敗しました', 'warning');
+            
+            // 組織リストを再度読み込む
+            setTimeout(() => {
+              loadUserOrganizations();
+            }, 1000);
           }
           
-          // データを読み込み
-          setTimeout(() => {
-            loadFromSupabase();
-            loadOrganizationMembers();
-            loadNotifications();
-          }, 500);
-        } else {
-          console.error('Organization not found in user organizations');
-          addToast('組織への参加に成功しましたが、組織情報の読み込みに失敗しました', 'warning');
+          // URLをクリーンアップ
+          window.history.pushState({}, '', '/');
+        })
+        .catch(error => {
+          console.error('Invitation acceptance failed:', error);
           
-          // 組織リストを再度読み込む
-          setTimeout(() => {
-            loadUserOrganizations();
-          }, 1000);
-        }
-        
-        // URLをクリーンアップ
-        window.history.pushState({}, '', '/');
-      })
-      .catch(error => {
-        console.error('Invitation acceptance failed:', error);
-        
-        let errorMessage = '招待の承認に失敗しました';
-        if (error.message) {
-          errorMessage = error.message;
-        }
-        
-        addToast(errorMessage, 'error');
-        window.history.pushState({}, '', '/');
-      });
-  }
-}, [user]);
+          let errorMessage = '招待の承認に失敗しました';
+          if (error.message) {
+            errorMessage = error.message;
+          }
+          
+          addToast(errorMessage, 'error');
+          window.history.pushState({}, '', '/');
+        });
+    }
+  }, [user]);
 
   // キーボードショートカット
   useEffect(() => {
@@ -3402,29 +3395,29 @@ useEffect(() => {
 
           {/* アクションバー */}
           <ActionBar
-  isSaving={isSaving}
-  isOnline={isOnline}
-  hasUnsavedChanges={hasUnsavedChanges}
-  lastSaved={lastSaved}
-  onSave={() => saveToSupabase(false)}
-  onExportSVG={exportChartAsSVG}
-  onExportJSON={exportData}
-  onImport={importData}
-  onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
-  onAddMember={addEmployee}
-  showIdeal={showIdeal}
-  onToggleIdeal={() => setShowIdeal(!showIdeal)}
-  chartType={chartType}
-  onChartTypeChange={setChartType}
-  isReadOnly={isReadOnly}
-  settings={settings}
-  onOpenSettings={() => setShowSettings(true)}
-  onSaveHistory={saveAsHistory}
-  evaluationDate={newEvaluationDate}
-  onEvaluationDateChange={setNewEvaluationDate}
-  evaluationMemo={newEvaluationMemo}
-  onEvaluationMemoChange={setNewEvaluationMemo}
-/>
+            isSaving={isSaving}
+            isOnline={isOnline}
+            hasUnsavedChanges={hasUnsavedChanges}
+            lastSaved={lastSaved}
+            onSave={() => saveToSupabase(false)}
+            onExportSVG={exportChartAsSVG}
+            onExportJSON={exportData}
+            onImport={importData}
+            onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
+            onAddMember={addEmployee}
+            showIdeal={showIdeal}
+            onToggleIdeal={() => setShowIdeal(!showIdeal)}
+            chartType={chartType}
+            onChartTypeChange={setChartType}
+            isReadOnly={isReadOnly}
+            settings={settings}
+            onOpenSettings={() => setShowSettings(true)}
+            onSaveHistory={saveAsHistory}
+            evaluationDate={newEvaluationDate}
+            onEvaluationDateChange={setNewEvaluationDate}
+            evaluationMemo={newEvaluationMemo}
+            onEvaluationMemoChange={setNewEvaluationMemo}
+          />
 
           {/* プログレスインジケーター */}
           {isSaving && (
@@ -3437,10 +3430,8 @@ useEffect(() => {
               {/* 左側: チャートエリア */}
               <Box sx={{ flex: { md: '0 0 60%' }, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto', pr: { md: 0.5 } }}>
 
-
-
                 {/* チャート */}
-                <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 0 }}>
+                <Card ref={chartRef} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', mb: 0, borderRadius: 2 }}>
                   <CardContent sx={{ p: 3 }}>
                     <Typography 
                       variant="h5" 
@@ -3454,17 +3445,17 @@ useEffect(() => {
                       {chartType === 'radar' ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <RadarChart data={prepareChartData()}>
-                            <PolarGrid stroke="#e2e8f0" strokeWidth={1.5} />
+                            <PolarGrid stroke="#D4E8E5" strokeWidth={1.5} />
                             <PolarAngleAxis 
                               dataKey="competency" 
-                              tick={{ fill: '#475569', fontSize: 12, fontWeight: 500 }} 
+                              tick={{ fill: '#1A2F4A', fontSize: 12, fontWeight: 500 }} 
                             />
                             <PolarRadiusAxis 
                               angle={90} 
                               domain={[0, 5]} 
-                              tick={{ fill: '#64748b', fontSize: 11 }} 
+                              tick={{ fill: '#5E7A8C', fontSize: 11 }} 
                               tickCount={6}
-                              stroke="#cbd5e1"
+                              stroke="#D4E8E5"
                             />
                             {showIdeal && (
                               <Radar 
@@ -3497,22 +3488,22 @@ useEffect(() => {
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 60 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#D4E8E5" />
                             <XAxis 
                               type="number" 
                               dataKey="technical" 
                               name="テクニカルスキル" 
                               domain={[0, 5.5]} 
-                              tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
-                              label={{ value: 'テクニカルスキル', position: 'bottom', offset: 10, style: { fill: '#475569', fontWeight: 600 } }}
+                              tick={{ fill: '#5E7A8C', fontSize: 12, fontWeight: 500 }}
+                              label={{ value: 'テクニカルスキル', position: 'bottom', offset: 10, style: { fill: '#1A2F4A', fontWeight: 600 } }}
                             />
                             <YAxis 
                               type="number" 
                               dataKey="human" 
                               name="ヒューマンスキル" 
                               domain={[0, 5.5]} 
-                              tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
-                              label={{ value: 'ヒューマンスキル', angle: -90, position: 'left', offset: 20, style: { fill: '#475569', fontWeight: 600 } }}
+                              tick={{ fill: '#5E7A8C', fontSize: 12, fontWeight: 500 }}
+                              label={{ value: 'ヒューマンスキル', angle: -90, position: 'left', offset: 20, style: { fill: '#1A2F4A', fontWeight: 600 } }}
                             />
                             <ZAxis range={[400, 400]} />
                             <Tooltip 
@@ -3521,7 +3512,7 @@ useEffect(() => {
                                 if (payload && payload.length > 0) {
                                   const data = payload[0].payload;
                                   return (
-                                    <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
+                                    <Paper elevation={3} sx={{ p: 2, borderRadius: 1.5 }}>
                                       <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
                                         {data.name}
                                       </Typography>
@@ -3563,6 +3554,7 @@ useEffect(() => {
                                         borderWidth: 2,
                                         borderStyle: entry.type === 'ideal' ? 'dashed' : 'solid',
                                         fontWeight: 600,
+                                        borderRadius: 1,
                                       }}
                                     />
                                   ))}
@@ -3588,7 +3580,7 @@ useEffect(() => {
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: '12px !important',
+                    borderRadius: '8px !important',
                     '&:before': { display: 'none' },
                   }}
                 >
@@ -3642,6 +3634,7 @@ useEffect(() => {
                     top: 0,
                     zIndex: 10,
                     bgcolor: 'background.paper',
+                    borderRadius: 2,
                   }}
                 >
                   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
@@ -3658,7 +3651,7 @@ useEffect(() => {
                         size="small"
                         sx={{ 
                           fontWeight: 700,
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          background: 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)',
                           color: 'white',
                         }}
                       />
@@ -3670,10 +3663,11 @@ useEffect(() => {
                     value={(selectedEmployees.length / employees.length) * 100} 
                     sx={{ 
                       height: 6, 
-                      borderRadius: 1,
-                      bgcolor: '#e2e8f0',
+                      borderRadius: 0.5,
+                      bgcolor: '#D4E8E5',
                       '& .MuiLinearProgress-bar': {
-                        background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(90deg, #4DB8AC 0%, #2D9B8F 100%)',
+                        borderRadius: 0.5,
                       }
                     }}
                   />
@@ -3691,7 +3685,7 @@ useEffect(() => {
                   sx={{
                     border: '1px solid',
                     borderColor: 'divider',
-                    borderRadius: '12px !important',
+                    borderRadius: '8px !important',
                     '&:before': { display: 'none' },
                   }}
                 >
@@ -3730,7 +3724,7 @@ useEffect(() => {
                           sx={{
                             border: '1px solid',
                             borderColor: 'divider',
-                            borderRadius: '8px !important',
+                            borderRadius: '6px !important',
                             '&:before': { display: 'none' },
                           }}
                         >
@@ -3750,8 +3744,9 @@ useEffect(() => {
                                       minWidth: 32,
                                       height: 24,
                                       fontWeight: 700,
-                                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                      background: 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)',
                                       color: 'white',
+                                      borderRadius: 1,
                                     }}
                                   />
                                   <Typography variant="caption" sx={{ pt: 0.25, lineHeight: 1.6, flex: 1 }}>
@@ -3779,9 +3774,9 @@ useEffect(() => {
                     elevation={0}
                     sx={{ 
                       border: '2px dashed',
-                      borderColor: '#cbd5e1',
-                      bgcolor: '#f8fafc',
-                      borderRadius: '12px !important',
+                      borderColor: '#7BCFC5',
+                      bgcolor: '#F5F9F8',
+                      borderRadius: '8px !important',
                       '&:before': { display: 'none' },
                     }}
                   >
@@ -3802,7 +3797,7 @@ useEffect(() => {
                         <Chip 
                           label={calculateAverage(idealProfile)} 
                           size="small" 
-                          sx={{ fontWeight: 700, bgcolor: '#e2e8f0' }}
+                          sx={{ fontWeight: 700, bgcolor: '#D4E8E5', borderRadius: 1 }}
                         />
                       </Stack>
                     </AccordionSummary>
@@ -3863,7 +3858,7 @@ useEffect(() => {
 
           {/* 成長履歴ビュー */}
           {viewMode === 'history' && (
-            <Card>
+            <Card sx={{ borderRadius: 2 }}>
               <CardContent>
                 <Typography variant="h4" gutterBottom>
                   📊 成長履歴
@@ -3876,7 +3871,7 @@ useEffect(() => {
                   <Grid container spacing={2}>
                     {evaluationHistory.map(history => (
                       <Grid item xs={12} md={6} key={history.id}>
-                        <Card variant="outlined">
+                        <Card variant="outlined" sx={{ borderRadius: 2 }}>
                           <CardContent>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                               <Typography variant="h6">
@@ -3899,7 +3894,7 @@ useEffect(() => {
                               )}
                             </Stack>
                             {history.memo && (
-                              <Chip label={history.memo} size="small" sx={{ mb: 2 }} />
+                              <Chip label={history.memo} size="small" sx={{ mb: 2, borderRadius: 1 }} />
                             )}
                             <Typography variant="body2" color="text.secondary">
                               {history.employees.length}人のメンバー
@@ -3916,7 +3911,7 @@ useEffect(() => {
 
           {/* 時系列比較ビュー */}
           {viewMode === 'comparison' && (
-            <Card>
+            <Card sx={{ borderRadius: 2 }}>
               <CardContent>
                 <Typography variant="h4" gutterBottom>
                   📈 成長トレンド分析
@@ -3932,7 +3927,7 @@ useEffect(() => {
                       if (timeline.length === 0) return null;
 
                       return (
-                        <Card key={emp.id} variant="outlined">
+                        <Card key={emp.id} variant="outlined" sx={{ borderRadius: 2 }}>
                           <CardContent>
                             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: emp.color }} />
@@ -3942,9 +3937,9 @@ useEffect(() => {
                             <Box sx={{ width: '100%', height: 300 }}>
                               <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={timeline}>
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                                  <YAxis domain={[0, 5]} />
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#D4E8E5" />
+                                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#5E7A8C' }} />
+                                  <YAxis domain={[0, 5]} tick={{ fill: '#5E7A8C' }} />
                                   <RechartsTooltip />
                                   <Legend />
                                   <Line 
@@ -3961,7 +3956,7 @@ useEffect(() => {
                             {timeline.length > 1 && (
                               <Grid container spacing={2} sx={{ mt: 2 }}>
                                 <Grid item xs={4}>
-                                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderRadius: 1.5 }}>
                                     <Typography variant="caption" color="text.secondary">
                                       初回評価
                                     </Typography>
@@ -3971,7 +3966,7 @@ useEffect(() => {
                                   </Paper>
                                 </Grid>
                                 <Grid item xs={4}>
-                                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderRadius: 1.5 }}>
                                     <Typography variant="caption" color="text.secondary">
                                       現在
                                     </Typography>
@@ -3981,7 +3976,7 @@ useEffect(() => {
                                   </Paper>
                                 </Grid>
                                 <Grid item xs={4}>
-                                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
+                                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: '#E8F6F4', borderRadius: 1.5, borderColor: '#4DB8AC' }}>
                                     <Typography variant="caption" color="success.main">
                                       成長率
                                     </Typography>
@@ -4005,7 +4000,7 @@ useEffect(() => {
           {/* チーム分析ダッシュボード */}
           {viewMode === 'dashboard' && (
             <Stack spacing={3}>
-              <Card>
+              <Card sx={{ borderRadius: 2 }}>
                 <CardContent>
                   <Typography variant="h4" gutterBottom>
                     📊 チーム全体の分析
@@ -4013,7 +4008,7 @@ useEffect(() => {
 
                   <Grid container spacing={3} sx={{ mb: 4 }}>
                     <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', borderRadius: 3 }}>
+                      <Paper sx={{ p: 3, background: 'linear-gradient(135deg, #4DB8AC 0%, #2D9B8F 100%)', color: 'white', borderRadius: 2 }}>
                         <Typography variant="caption">チーム平均スコア</Typography>
                         <Typography variant="h3" fontWeight={700}>
                           {(() => {
@@ -4025,7 +4020,7 @@ useEffect(() => {
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 3, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', borderRadius: 3 }}>
+                      <Paper sx={{ p: 3, background: 'linear-gradient(135deg, #5BA3D0 0%, #2C4A6E 100%)', color: 'white', borderRadius: 2 }}>
                         <Typography variant="caption">最高スコア保持者</Typography>
                         <Typography variant="h5" fontWeight={700}>
                           {(() => {
@@ -4039,7 +4034,7 @@ useEffect(() => {
                     </Grid>
 
                     <Grid item xs={12} md={4}>
-                      <Paper sx={{ p: 3, background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', borderRadius: 3 }}>
+                      <Paper sx={{ p: 3, background: 'linear-gradient(135deg, #7BCFC5 0%, #4DB8AC 100%)', color: 'white', borderRadius: 2 }}>
                         <Typography variant="caption">評価実施回数</Typography>
                         <Typography variant="h3" fontWeight={700}>
                           {evaluationHistory.length + 1}回
@@ -4050,13 +4045,13 @@ useEffect(() => {
 
                   <Grid container spacing={3}>
                     <Grid item xs={12} md={6}>
-                      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, bgcolor: 'success.50' }}>
-                        <Typography variant="h6" color="success.dark" gutterBottom>
+                      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#E8F6F4', borderColor: '#4DB8AC' }}>
+                        <Typography variant="h6" color="#2D9B8F" gutterBottom>
                           💪 チームの強み TOP3
                         </Typography>
                         <Stack spacing={2}>
                           {topStrengths.map(([key, stat], index) => (
-                            <Paper key={key} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Paper key={key} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 1.5 }}>
                               <Box>
                                 <Typography variant="subtitle2" fontWeight={600}>
                                   {index + 1}. {stat.name}
@@ -4075,13 +4070,13 @@ useEffect(() => {
                     </Grid>
 
                     <Grid item xs={12} md={6}>
-                      <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, bgcolor: 'warning.50' }}>
+                      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#FFF4E6', borderColor: '#F5A623' }}>
                         <Typography variant="h6" color="warning.dark" gutterBottom>
                           📌 強化すべき領域 TOP3
                         </Typography>
                         <Stack spacing={2}>
                           {bottomWeaknesses.map(([key, stat], index) => (
-                            <Paper key={key} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Paper key={key} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 1.5 }}>
                               <Box>
                                 <Typography variant="subtitle2" fontWeight={600}>
                                   {index + 1}. {stat.name}
